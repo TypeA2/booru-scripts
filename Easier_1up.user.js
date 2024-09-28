@@ -1,13 +1,13 @@
 // ==UserScript==
 // @name        Easier 1up
-// @namespace   Violentmonkey Scripts
+// @namespace   https://github.com/TypeA2/booru-scripts
 // @match       *://*.donmai.us/uploads/*
 // @grant       none
-// @version     1.0.2
+// @version     1.0.3
 // @author      TypeA2
 // @description 2024-06-18 (initial), 2024-06-19 (current)
-// @downloadURL https://gist.github.com/TypeA2/bff1474c0f4ca2188cf21897d4e4b2dd/raw/Easier_1up.user.js
-// @updateURL   https://gist.github.com/TypeA2/bff1474c0f4ca2188cf21897d4e4b2dd/raw/Easier_1up.user.js
+// @downloadURL https://github.com/TypeA2/booru-scripts/raw/refs/heads/master/Easier_1up.user.js
+// @updateURL   https://github.com/TypeA2/booru-scripts/raw/refs/heads/master/Easier_1up.user.js
 // @run-at      document-end
 // ==/UserScript==
 
