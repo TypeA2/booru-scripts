@@ -7,7 +7,7 @@
 // @grant       GM_getValue
 // @grant       GM_setValue
 // @grant       GM_addStyle
-// @version     3.0.0a
+// @version     3.0.0b
 // @author      TypeA2
 // @description Various utilities to make life easier
 // @downloadURL https://github.com/TypeA2/booru-scripts/raw/refs/heads/master/Awoobooru3.user.js
@@ -366,7 +366,7 @@ const SPECIAL_TAGS = [
     ...Object.keys(PREFIX_TO_CATEGORY).map(e => `${e}:`)
 ];
 
-const TAG_FORMAT_ORDER = [ "1", "3", "4", "0", "5", "-1", "-2" ];
+const TAG_FORMAT_ORDER = [ "1", "3", "4", "0", "5", "-1", "-2", "-127", "-128" ];
 
 class TagCheckerFeature {
     constructor() {
@@ -390,6 +390,9 @@ class TagCheckerFeature {
         this.form_submit_handler = async e => {
             e.preventDefault();
             if (await this.validate_tags()) {
+
+                /* The event handler isn't removed yet when this code runs, so manually disable it */
+                this.form.off("submit", this.form_submit_handler);
                 this.form.submit();
             } else {
                 this.form.one("submit", this.form_submit_handler);
@@ -458,9 +461,12 @@ class TagCheckerFeature {
         );
 
         let special_tags = new Set();
-        let normal_tags = [];
+        let normal_tags = new Set();
+        let removed_tags = new Set();
 
-        for (const tag of tags) {
+        for (let tag of tags) {
+            const is_negated = (tag[0] === "-");
+
             if (tag.includes(":")) {
                 if (SPECIAL_TAGS.find(prefix => tag.startsWith(prefix) && tag.length > prefix.length)) {
                     special_tags.add(tag);
@@ -470,8 +476,17 @@ class TagCheckerFeature {
                 /* Fallthrough */
             }
 
-            normal_tags.push(tag);
+            if (is_negated) {
+                removed_tags.add(tag.substring(1));
+            } else {
+                normal_tags.add(tag);
+            }
         }
+
+        /* Remove removed tags from both sets */
+        const found_removed_tags = normal_tags.intersection(removed_tags);
+        normal_tags = [ ...normal_tags.difference(found_removed_tags) ];
+        removed_tags = removed_tags.difference(found_removed_tags);
 
         let found_tags = {};
         for (const chunk of array_chunks(normal_tags, 1000)) {
@@ -487,12 +502,14 @@ class TagCheckerFeature {
             "4": [], /* character */
             "5": [], /* meta */
             "-1": [], /* special */
-            "-2": [], /* not found */
+            "-2": [], /* removals */
+            "-127": [], /* deprecated */
+            "-128": [], /* not found */
         };
 
         for (const tag of normal_tags) {
             if (!found_tags.hasOwnProperty(tag)) {
-                all_tags[-2].push(tag)
+                all_tags[-128].push(tag)
             } else {
                 all_tags[found_tags[tag].category].push(tag)
             }
@@ -508,7 +525,8 @@ class TagCheckerFeature {
 
                 /* Handle a few special tags */
                 if (tag.startsWith("rating:")) {
-                    const rating = tag.substring(7, 1).toLowerCase();
+                    log.info(tag);
+                    const rating = tag.substring(7, 8).toLowerCase();
                     if ("gsqe".includes(rating)) {
                         $(`#post_rating_${rating}`).prop("checked", true);
                         continue;
@@ -526,6 +544,8 @@ class TagCheckerFeature {
             }
         }
 
+        all_tags[-2] = [ ...removed_tags.map(e => "-" + e) ];
+
         let new_tag_string = "";
         for (const category of TAG_FORMAT_ORDER.slice(0, -1)) {
             if (all_tags[category].length > 0) {
@@ -535,16 +555,16 @@ class TagCheckerFeature {
 
         const update_text = () => {
             for (const el of $(".awoo-tag-checker-fixer")) {
-                all_tags[-2][el.dataset.index] = el.value;
+                all_tags[-128][el.dataset.index] = el.value;
             }
 
-            this.tags_field.val(new_tag_string + all_tags[-2].filter(s => /\S/.test(s)).join(" "));
+            this.tags_field.val(new_tag_string + all_tags[-128].filter(s => /\S/.test(s)).join(" "));
         };
 
         update_text();
 
         const forgot_rating = ($("input[name='post[rating]']:checked").length === 0);
-        if (!forgot_rating && all_tags[-2].length === 0) {
+        if (!forgot_rating && all_tags[-128].length === 0) {
             return true;
         }
 
@@ -558,7 +578,7 @@ class TagCheckerFeature {
             id: "awoo-tag-checker-notice",
             "class": "notice-error",
             html: $("<table></table>", {
-                html:  all_tags[-2].map(tag =>
+                html:  all_tags[-128].map(tag =>
                     $("<tr></tr>", {
                         "data-row-num": input_row ,
                         html: [
@@ -588,7 +608,7 @@ class TagCheckerFeature {
                                     click: e => {
                                         const row = e.target.parentElement.parentElement;
                                         const row_idx = +row.dataset.rowNum;
-                                        all_tags[-2][row_idx] = "";
+                                        all_tags[-128][row_idx] = "";
                                         row.remove();
                                         update_text();
 
