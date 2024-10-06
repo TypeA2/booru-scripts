@@ -345,18 +345,26 @@ class OneUpFeature {
 
 /* https://github.com/danbooru/danbooru/blob/a9593dda98db89576278defc06eb20650faa784d/app/logical/tag_category.rb#L16 */
 const PREFIX_TO_CATEGORY = {
-    gen: 0,
-    general: 0,
-    art: 1,
-    artist: 1,
-    co: 3,
-    copy: 3,
-    copyright: 3,
-    ch: 4,
-    char: 4,
-    character: 4,
-    meta: 5
+    gen: "general",
+    general: "general",
+    art: "artist",
+    artist: "artist",
+    co: "copyright",
+    copy: "copyright",
+    copyright: "copyright",
+    ch: "character",
+    char: "character",
+    character: "character",
+    meta: "meta"
 };
+
+const CATEGORY_TO_NAME = {
+    "0": "general",
+    "1": "artist",
+    "3": "copyright",
+    "4": "character",
+    "5": "meta"
+}
 
 const SPECIAL_TAGS = [
     "rating:", "parent:", "child:", "source:",
@@ -366,7 +374,7 @@ const SPECIAL_TAGS = [
     ...Object.keys(PREFIX_TO_CATEGORY).map(e => `${e}:`)
 ];
 
-const TAG_FORMAT_ORDER = [ "1", "3", "4", "0", "5", "-1", "-2", "-127", "-128" ];
+const TAG_FORMAT_ORDER = [ "artist", "copyright", "character", "general", "meta", "special", "removed", "deprecated", "not_found" ];
 
 class TagCheckerFeature {
     constructor() {
@@ -439,16 +447,16 @@ class TagCheckerFeature {
         return success;
     }
 
-    async #validate_tags() {
-        this.tags_field.removeClass("awoo-disabled");
-
-        let tags = (this.tags_field.val() || "").split(/([\s\n])/).map(tag => tag.toLowerCase())
+    async #get_tags() {
+        let raw_tags = (this.tags_field.val() || "")
+            .split(/([\s\n])/)
+            .map(tag => tag.toLowerCase())
             .filter(s => /\S/.test(s))
             .sort();
 
-        tags = Array.from(
+        return Array.from(
             await Promise.all(
-                new Set(tags).map(async v => {
+                new Set(raw_tags).map(async v => {
                     if (v[0] === "/") {
                         /* Resolve abbreviation */
                         const res = await fetch(`/autocomplete.json?search[query]=${v}&search[type]=tag&limit=1&only=value`).then(r => r.json());
@@ -459,7 +467,9 @@ class TagCheckerFeature {
                 })
             )
         );
+    }
 
+    static #categorize_tags(tags) {
         let special_tags = new Set();
         let normal_tags = new Set();
         let removed_tags = new Set();
@@ -484,48 +494,219 @@ class TagCheckerFeature {
         }
 
         /* Remove removed tags from both sets */
-        const found_removed_tags = normal_tags.intersection(removed_tags);
-        normal_tags = [ ...normal_tags.difference(found_removed_tags) ];
-        removed_tags = removed_tags.difference(found_removed_tags);
+        const present_removed_tags = normal_tags.intersection(removed_tags);
 
+        return {
+            normal: [ ...normal_tags.difference(present_removed_tags) ],
+            special: [ ...special_tags ],
+            removed: [ ...removed_tags.difference(present_removed_tags) ]
+        }
+    }
+
+    async #retrieve_tags(tags) {
         let found_tags = {};
-        for (const chunk of array_chunks(normal_tags, 1000)) {
+        for (const chunk of array_chunks(tags, 1000)) {
             const items = await search_items("tags", { name: chunk, hide_empty: true }, [ "id", "name", "is_deprecated", "category" ]);
             
             items.forEach(e => found_tags[e.name] = { id: e.id, is_deprecated: e.is_deprecated, category: e.category });
         }
 
-        const all_tags = {
-            "0": [], /* general */
-            "1": [], /* artist */
-            "3": [], /* copyright */
-            "4": [], /* character */
-            "5": [], /* meta */
-            "-1": [], /* special */
-            "-2": [], /* removals */
-            "-127": [], /* deprecated */
-            "-128": [], /* not found */
-        };
+        return found_tags;
+    }
 
-        for (const tag of normal_tags) {
-            if (!found_tags.hasOwnProperty(tag)) {
-                all_tags[-128].push(tag)
-            } else {
-                all_tags[found_tags[tag].category].push(tag)
+    #update_tag_string() {
+        let new_tag_string = "";
+
+        for (const el of $(".awoo-tag-checker-fixer")) {
+            /* Read current values from form */
+            this.tag_map[el.dataset.rowKey][el.dataset.rowIdx] = el.value;
+        }
+
+        for (const category of TAG_FORMAT_ORDER) {
+            /* Ignore empty categories */
+            if (this.tag_map[category].length > 0) {
+                /* Ignore empty tags */
+                new_tag_string += this.tag_map[category].filter(s => /\S/.test(s)).join(" ") + "\n";
             }
         }
 
+        this.tags_field.val(new_tag_string);
+    }
+
+    get #forgot_rating() {
+        return ($("input[name='post[rating]']:checked").length === 0);
+    }
+
+    get #can_submit() {
+        /* Check if rating is selected and whether any deprecated or unknown tags remain */
+        if (!this.#forgot_rating && this.tag_map.deprecated.length === 0 && this.tag_map.not_found.length === 0) {
+            return true;
+        }
+
+        return false;
+    }
+
+    #make_fixer_row(caption, tag, row_idx, row_key, arr) {
+        const row = $("<tr></tr>", {
+            "data-row-idx": row_idx,
+            "data-row-key": row_key,
+        });
+
+        const row_contents = [
+            $("<th></th>", {
+                html: $("<label></label>", {
+                    text: caption + ":",
+                    "for": `awoo-tag-checker-${row_idx}`
+                })
+            }),
+            $("<td></td>", {
+                html: $("<input>", {
+                    type: "text",
+                    class: "awoo-tag-checker-fixer",
+                    value: tag,
+                    id: `awoo-tag-checker-${row_idx}`,
+                    "data-autocomplete": "tag",
+                    "data-original-tag": tag,
+                    "data-row-key": row_key,
+                    "data-row-idx": row_idx,
+                    tabindex: row_idx + 1
+                })
+            }),
+            $("<td></td>", {
+                html: $("<a></a>", {
+                    html: "&times;",
+                    "class": "awoo-remove-tag",
+                    href: "#",
+                    title: `Remove "${tag}"`,
+                    click: _ => {
+                        /* Making a tag empty ignores it in formatting, effectively removing it without having to recalculate indices */
+                        //this.tag_map[row.attr("data-row-key")][row.attr("data-row-idx")] = "";
+                        arr[row_idx] = "";
+                        row.remove();
+                        
+                        this.#update_tag_string();
+                        this.#reformat_notice();
+                    }
+                })
+            })
+        ]
+
+        row.append(row_contents);
+
+        return row;
+    }
+
+    #create_fixer_notice() {
+        const notice_fields = [];
+
+        if (this.#forgot_rating) {
+            const ratings = $(".post_rating");
+            ratings.addClass("field_with_errors");
+            ratings.one("input", _ => {
+                ratings.removeClass("field_with_errors");
+                $("#awoo-rating-notice").remove();
+
+                this.#reformat_notice();
+            });
+
+            notice_fields.push(
+                $("<tr></tr>", {
+                    id: "awoo-rating-notice",
+                    "data-row-key": "rating",
+                    html: $("<th></th>", {
+                        colspan: 3,
+                        text: "Rating not selected!"
+                    })
+                })
+            );
+        }
+
+        const deprecated_fields = this.tag_map.deprecated.map((tag, idx, arr) => this.#make_fixer_row("Deprecated", tag, idx, "deprecated", arr));
+        const not_found_fields = this.tag_map.not_found.map((tag, idx, arr) => this.#make_fixer_row("New tag", tag, idx, "not_found", arr));
+
+        notice_fields.push(...deprecated_fields);
+        notice_fields.push(...not_found_fields);
+
+        const inputs = $(notice_fields.map(e => e[0])).find("input[data-autocomplete='tag']");
+        log.info(inputs);
+        inputs.autocomplete({
+            source: async (request, respond) => respond(await Danbooru.Autocomplete.autocomplete_source(request.term, "tag")),
+            close: (e) => {
+                /* Prevent inserting multiple tags */
+                e.target.value = e.target.value.split(" ")[0];
+                this.#update_tag_string();
+            }
+        });
+        inputs.on("focus", e => $(e.target).data("uiAutocomplete").search(e.target.value));
+        inputs.on("input", _ => this.#update_tag_string());
+
+        const notice = $("<div></div>", {
+            id: "awoo-tag-checker-notice",
+            "class": "notice-error",
+            html: $("<table></table>", { html: notice_fields })
+        });
+
+        return notice;
+    }
+
+    #reformat_notice() {
+        /* Remove duplicate separators */
+        $("#awoo-tag-checker-notice hr + hr").remove();
+
+        /* If nothing remains, remove the notice entirely */
+        if ($(".awoo-tag-checker-fixer").length === 0) {
+            this.tags_field.removeClass("awoo-disabled");
+            $("#awoo-tag-checker-notice").remove();
+        }
+    }
+
+    async #validate_tags() {
+        this.tags_field.removeClass("awoo-disabled");
+
+        this.tag_map = {
+            general: [],
+            artist: [],
+            copyright: [],
+            character: [],
+            meta: [],
+            special: [],
+            removed: [],
+            deprecated: [],
+            not_found: [],
+        }
+
+        const tags = await this.#get_tags();
+        let { normal: normal_tags, special: special_tags, removed: removed_tags } = TagCheckerFeature.#categorize_tags(tags);
+        
+        /* Store them with the leading "-" */
+        this.tag_map.not_found = removed_tags.map(tag => "-" + tag);
+
+        const found_tags = await this.#retrieve_tags(normal_tags);
+
+        /* Categorize regular tags */
+        for (const tag of normal_tags) {
+            if (!found_tags.hasOwnProperty(tag)) {
+                this.tag_map.not_found.push(tag);
+            } else {
+                if (found_tags[tag].is_deprecated) {
+                    this.tag_map.deprecated.push(tag);
+                } else {
+                    this.tag_map[CATEGORY_TO_NAME[found_tags[tag].category]].push(tag);
+                }
+            }
+        }
+
+        /* Categorize prefixed tags */
         for (const tag of special_tags) {
-            const operator = tag.split(":")[0];
-            if (PREFIX_TO_CATEGORY.hasOwnProperty(operator)) {
+            const prefix = tag.split(":")[0];
+            if (PREFIX_TO_CATEGORY.hasOwnProperty(prefix)) {
                 /* Create a new tag with a specific type */
-                all_tags[PREFIX_TO_CATEGORY[operator]].push(tag);
+                this.tag_map[PREFIX_TO_CATEGORY[prefix]].push(tag)
             } else {
                 /* Other meta tag */
 
                 /* Handle a few special tags */
                 if (tag.startsWith("rating:")) {
-                    log.info(tag);
                     const rating = tag.substring(7, 8).toLowerCase();
                     if ("gsqe".includes(rating)) {
                         $(`#post_rating_${rating}`).prop("checked", true);
@@ -540,130 +721,32 @@ class TagCheckerFeature {
                     continue;
                 }
 
-                all_tags["-1"].push(tag);
+                this.tag_map.special.push(tag);
             }
         }
 
-        all_tags[-2] = [ ...removed_tags.map(e => "-" + e) ];
+        this.#update_tag_string();
 
-        let new_tag_string = "";
-        for (const category of TAG_FORMAT_ORDER.slice(0, -1)) {
-            if (all_tags[category].length > 0) {
-                new_tag_string += all_tags[category].join(" ") + "\n";
-            }
-        }
-
-        const update_text = () => {
-            for (const el of $(".awoo-tag-checker-fixer")) {
-                all_tags[-128][el.dataset.index] = el.value;
-            }
-
-            this.tags_field.val(new_tag_string + all_tags[-128].filter(s => /\S/.test(s)).join(" "));
-        };
-
-        update_text();
-
-        const forgot_rating = ($("input[name='post[rating]']:checked").length === 0);
-        if (!forgot_rating && all_tags[-128].length === 0) {
+        if (this.#can_submit) {
             return true;
         }
 
-        this.tags_field.one("focus", _ => {
+        /* Reset all checker fields once the tags field is edited */
+        this.tags_field.one("input", _ => {
             $("#awoo-tag-checker-notice").remove();
             this.tags_field.removeClass("awoo-disabled");
         });
         this.tags_field.addClass("awoo-disabled");
-        let input_row = 0;
-        const notice = $("<div></div>", {
-            id: "awoo-tag-checker-notice",
-            "class": "notice-error",
-            html: $("<table></table>", {
-                html:  all_tags[-128].map(tag =>
-                    $("<tr></tr>", {
-                        "data-row-num": input_row ,
-                        html: [
-                            $("<th></th>", {
-                                html: $("<label></label>", {
-                                    text: tag,
-                                    "for": `awoo-tag-checker-${++input_row}`
-                                })
-                            }),
-                            $("<td></td>", {
-                                html: $("<input>", {
-                                    type: "text",
-                                    class: "awoo-tag-checker-fixer",
-                                    value: tag,
-                                    id: `awoo-tag-checker-${input_row}`,
-                                    "data-autocomplete": "tag",
-                                    "data-original-tag": tag,
-                                    "data-index": input_row - 1,
-                                })
-                            }),
-                            $("<td></td>", {
-                                html: $("<a></a>", {
-                                    html: "&times;",
-                                    "class": "awoo-remove-tag",
-                                    href: "#",
-                                    title: `Remove "${tag}"`,
-                                    click: e => {
-                                        const row = e.target.parentElement.parentElement;
-                                        const row_idx = +row.dataset.rowNum;
-                                        all_tags[-128][row_idx] = "";
-                                        row.remove();
-                                        update_text();
+        
 
-                                        if ($(".awoo-tag-checker-fixer").length === 0) {
-                                            this.tags_field.removeClass("awoo-disabled");
-                                            $("#awoo-tag-checker-notice").remove();
-                                        }
-                                    }
-                                })
-                            })
-                        ]
-                    })            
-                )
-                
-            })
-        });
-
-        if (forgot_rating) {
-            const ratings = $(".post_rating");
-            ratings.addClass("field_with_errors");
-            ratings.one("input", _ => {
-                ratings.removeClass("field_with_errors");
-                $("#awoo-rating-notice").remove();
-
-                if ($("#awoo-tag-checker-notice table").children().length === 0) {
-                    $("#awoo-tag-checker-notice").remove();
-                }
-            });
-
-            notice.prepend($("<tr></tr>", {
-                id: "awoo-rating-notice",
-                html: $("<th></th>", {
-                    colspan: 3,
-                    text: "Rating not selected!"
-                })
-            }));
-        }
+        const notice = this.#create_fixer_notice();
 
         this.tags_field.after(notice);
-
-        const inputs = $(".awoo-tag-checker-fixer");
-        inputs.autocomplete({
-            source: async (request, respond) => respond(await Danbooru.Autocomplete.autocomplete_source(request.term, "tag")),
-            close: e => {
-                e.target.value = e.target.value.split(" ")[0];
-                update_text();
-            }
-        });
-        inputs.on("focus", e => $(e.target).data("uiAutocomplete").search(e.target.value));
-        inputs.on("input", e => update_text());
 
         log.info("Special tags", special_tags);
         log.info("Normal tags", normal_tags);
         log.info("Found tags", found_tags);
-        log.info("Tag categories", all_tags);
+        log.info("Tag categories", this.tag_map);
 
         return false;
     }
