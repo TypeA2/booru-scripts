@@ -17,16 +17,16 @@
 
 "use strict";
 
-/* These also act as default options */
-const options = {
+const DEFAULT_OPTIONS = {
     tag_checker: {
         enabled: true,
         autocorrect: {
             enabled: true,
+            dictionary: [],
         }
     },
     oneup: {
-        enabled: true
+        enabled: true,
     }
 };
 
@@ -43,21 +43,118 @@ const log = {
 
 Object.freeze(log);
 
-function load_settings() {
-    const get_or_default = (key, def) => {
-        let val = GM_getValue(key);
-        if (val === undefined) {
-            GM_setValue(key, def);
-            return def;
-        }
-        return val;
-    }
-    
-    options.tag_checker.enabled = get_or_default("tag-checker-enabled", options.tag_checker.enabled);
-    options.oneup.enabled = get_or_default("1up-enabled", options.oneup.enabled);
+class Options {
+    static #options;
 
-    log.info("Loaded options:", options);
+    static #callbacks = [];
+
+    static watch(key, cb) {
+        this.#callbacks.push({ key, cb });
+    }
+
+    static set(path, val) {
+        const old = this.#get_key(this.#options, path);
+
+        if (old !== val) {
+            log.info(`Updating ${path} from`, old, "to", val);
+            this.#set_key(this.#options, path, val);
+            localStorage.setItem("awoo-options", JSON.stringify(this.#options));
+
+            for (const { key, cb } of this.#callbacks) {
+                if (key === path) {
+                    cb(old, val);
+                }
+            }
+        }
+    }
+
+    static get(path) {
+        return this.#get_key(this.#options, path);
+    }
+
+    static #get_key(obj, path) {
+        let target = obj;
+        for (const key of path.split(".")) {
+            if (!target.hasOwnProperty(key)) {
+                throw new Error(`Key ${el} not found (path: ${path})`);
+            }
+
+            target = target[key];
+        }
+
+        return target;
+    }
+
+    static #set_key(obj, path, val) {
+        let target = obj;
+        const full_path = path.split(".");
+        for (const key of full_path.slice(0, -1)) {
+            if (!target.hasOwnProperty(key)) {
+                throw new Error(`Key ${el} not found (path: ${path})`);
+            }
+
+            target = target[key];
+        }
+
+        
+        if (!target.hasOwnProperty(full_path.slice(-1))) {
+            throw new Error(`Key ${el} not found (path: ${path})`);
+        }
+
+        target[full_path.slice(-1)] = val;
+    }
+
+    static #storage_change(old) {
+        for (const { key, cb } of this.#callbacks) {
+            let old_target;
+            let new_target;
+            try {
+                old_target = this.#get_key(old, key);
+            } catch (e) {
+                log.error("Old value", e);
+                continue;
+            }
+
+            try {
+                new_target = this.#get_key(this.#options, key);
+            } catch (e) {
+                log.error("New value", e);
+                continue;
+            }
+
+            if (old_target !== new_target) {
+                cb(old_target, new_target);
+            }
+        }
+    }
+
+    static {
+        const val = localStorage.getItem("awoo-options");
+        if (val === null) {
+            this.#options = DEFAULT_OPTIONS;
+            localStorage.setItem("awoo-options", JSON.stringify(this.#options));
+        } else {
+            this.#options = JSON.parse(val);
+        }
+
+        window.addEventListener("storage", (e) => {
+            if (e.key === "awoo-options") {
+                const old = this.#options;
+                
+                this.#options = JSON.parse(e.newValue);
+
+                log.info("Reloaded options:", this.#options);
+
+                this.#storage_change(old);
+            }
+        });
+
+        log.info("Loaded options:", this.#options);
+    }
 }
+
+/*
+
 
 function form_table_element(kind, title, name, input_options) {
     let input_type;
@@ -137,7 +234,7 @@ function open_settings() {
 
                 options.tag_checker.autocorrect.enabled = (dialog.find("#tag-checker-autocorrect-enabled").val() === "true");
                 GM_setValue("tag-checker-autocorrect-enabled", options.tag_checker.autocorrect.enabled);
-                /* Do nothing: tag checker reads the options object directly */
+                // Do nothing: tag checker reads the options object directly 
 
                 options.oneup.enabled = (dialog.find("#1up-enabled").val() === "true");
                 GM_setValue("1up-enabled", options.oneup.enabled);
@@ -151,7 +248,7 @@ function open_settings() {
         }
     });
 }
-
+*/
 function* array_chunks(arr, n) {
     for (let i = 0; i < arr.length; i += n) {
         yield arr.slice(i, i + n);
@@ -209,9 +306,7 @@ function search_items(endpoint, search_data, attributes) {
     });
 }
 
-load_settings();
-
-GM_registerMenuCommand("Open settings", open_settings, { title: "Open settings menu" });
+// GM_registerMenuCommand("Open settings", open_settings, { title: "Open settings menu" });
 
 const style = `
 #awoo-check-tags {
@@ -259,7 +354,7 @@ class OneUpFeature {
 
         this.posts = [];
 
-        if (!options.oneup.enabled) {
+        if (!Options.get("oneup.enabled")) {
             return;
         }
 
@@ -281,6 +376,14 @@ class OneUpFeature {
         
         this.observer = new MutationObserver(mutation_callback);
         this.observer.observe(document.getElementById("iqdb-similar"), { subtree: true, childList: true });
+
+        Options.watch("oneup.enabled", (_, is_enabled) => {
+            if (is_enabled) {
+                this.enable();
+            } else {
+                this.disable();
+            }
+        });
     }
 
     enable() {
@@ -407,7 +510,15 @@ class TagCheckerFeature {
             }
         };
 
-        if (options.tag_checker.enabled) {
+        Options.watch("tag_checker.enabled", (_, is_enabled) => {
+            if (is_enabled) {
+                this.enable();
+            } else {
+                this.disable();
+            }
+        });
+
+        if (Options.get("tag_checker.enabled")) {
             this.enable();
         }
     }
@@ -750,6 +861,14 @@ class TagCheckerFeature {
 
         return false;
     }
+}
+
+unsafeWindow.awoo_set_option = function(key, val) {
+    Options.set(key, val);
+}
+
+unsafeWindow.awoo_get_option = function(key) {
+    return Options.get(key);
 }
 
 if (location.pathname.startsWith("/uploads/")
