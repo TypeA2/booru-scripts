@@ -17,18 +17,23 @@
 
 "use strict";
 
-const DEFAULT_OPTIONS = {
-    tag_checker: {
-        enabled: true,
-        autocorrect: {
-            enabled: true,
-            dictionary: [],
-        }
+const OPTIONS_SCHEMA = {
+    "oneup.enabled": {
+        caption: "Easy 1up",
+        defval: true,
+        type: "enable",
     },
-    oneup: {
-        enabled: true,
+    "tag_checker.enabled": {
+        caption: "Tag checker",
+        defval: true,
+        type: "enable",
+    },
+    "tag_checker.autocorrect.enabled": {
+        caption: "Autocorrect",
+        defval: true,
+        type: "enable",
     }
-};
+}
 
 function __log(func, args) {
     func.apply(null, [ `[Awoobooru]`, ...args ])
@@ -47,6 +52,29 @@ class Options {
     static #options;
 
     static #callbacks = [];
+
+    static get default_options() {
+        let res = {};
+
+        for (const [key, desc] of Object.entries(OPTIONS_SCHEMA)) {
+            const path = key.split(".");
+            const valkey = path.pop();
+
+            let cur = res;
+
+            for (const part of path) {
+                if (!cur.hasOwnProperty(part)) {
+                    cur[part] = {};
+                }
+
+                cur = cur[part];
+            }
+
+            cur[valkey] = desc.defval;
+        }
+
+        return res;
+    }
 
     static watch(key, cb) {
         this.#callbacks.push({ key, cb });
@@ -131,7 +159,7 @@ class Options {
     static {
         const val = localStorage.getItem("awoo-options");
         if (val === null) {
-            this.#options = DEFAULT_OPTIONS;
+            this.#options = this.default_options;
             localStorage.setItem("awoo-options", JSON.stringify(this.#options));
         } else {
             this.#options = JSON.parse(val);
@@ -151,104 +179,82 @@ class Options {
 
         log.info("Loaded options:", this.#options);
     }
-}
 
-/*
+    static #dialog_inputs() {
+        let res = [];
 
+        for (const [key, desc] of Object.entries(OPTIONS_SCHEMA)) {
+            const row = $("<div></div>", {
+                "class": "input"
+            });
+            row.append($("<label></label>", {
+                "for": "awoo-option-" + key,
+                text: desc.caption
+            }));
+            
+            switch (desc.type) {
+                case "enable":
+                    const enable_opt = $("<option></option>", {
+                        value: "enabled",
+                        text: "Enabled"
+                    });
+                    const disable_opt = $("<option></option>", {
+                        value: "disabled",
+                        text: "Disabled"
+                    });
 
-function form_table_element(kind, title, name, input_options) {
-    let input_type;
-    switch (kind) {
-        case "select":
-            input_type = "<select></select>";
-            break;
+                    if (this.get(key)) {
+                        enable_opt.prop("selected", true);
+                    } else {
+                        disable_opt.prop("selected", true);
+                    }
 
-        default:
-            input_type = `<input type="${kind}">`
+                    row.append($("<select></select>", {
+                        "data-option-path": key,
+                        id: "awoo-option-" + key,
+                        class: "awoo-option-input",
+                        data: {
+                            converter: el => el.value === "enabled"
+                        },
+                        html: [ enable_opt, disable_opt ]
+                    }));
+                    break;
+            }
+
+            res.push(row);
+        }
+
+        return res;
     }
 
-    return $("<tr></tr>", {
-        html: [
-            `<th><label for="${name}">${title}</label></th>`,
-            $("<td></td>", {
-                html: $(input_type,  {
-                    id: name,
-                    ...input_options
+    static open_dialog() {
+        const dialog_body = $("<div></div>", {
+            html: [
+                $("<form></form>", {
+                    class: "simple_form",
+                    id: "awoo-options-form",
+                    html: this.#dialog_inputs(),
                 })
-            })
-        ]
-    });
+            ]
+        });
+
+        const dialog = dialog_body.dialog({
+            title: "Awoobooru 3 settings",
+            width: 960,
+            modal: true,
+            buttons: {
+                Submit: () => {
+                    for (const el of dialog.find(".awoo-option-input")) {
+                        Options.set(el.dataset.optionPath, $(el).data("converter")(el));
+                    }
+                    dialog.dialog("close");
+                },
+                Cancel: () => dialog.dialog("close")
+            }
+        });
+    }
 }
 
-function form_yes_no(key, title) {
-    return form_table_element("select", title, key, {
-        html: [
-            `<option value="true">Yes</option>`,
-            `<option value="false">No</option>`
-        ]
-    })
-}
-
-function open_settings() {
-    const dialog_body = $("<div></div>", {
-        html: [
-            $("<form></form>", {
-                class: "simple-form",
-                html: [
-                    "<h4>Tag checker</h4>",
-                    $("<table></table>", {
-                        class: "table-sm",
-                        html: [
-                            form_yes_no("tag-checker-enabled", "Enabled"),
-                            "<tr><th>Autocorrect</th><td></td></tr>",
-                            form_yes_no("tag-checker-autocorrect-enabled", "Enabled")
-                        ]
-                    }),
-                    "<h4>Easy 1up</h4>",
-                    $("<table></table>", {
-                        class: "table-sm",
-                        html: [
-                            form_yes_no("1up-enabled", "Enabled")
-                        ]
-                    })
-                ]
-            })
-        ]
-    });
-
-    const dialog = dialog_body.dialog({
-        title: "Awoobooru 3 settings",
-        width: 700,
-        modal: true,
-        open: (e) => {
-            const t = $(e.target);
-            
-            t.find("#tag-checker-enabled").val(options.tag_checker.enabled.toString());
-            t.find("#1up-enabled").val(options.oneup.enabled.toString());
-        },
-        buttons: {
-            Submit: () => {
-                options.tag_checker.enabled = (dialog.find("#tag-checker-enabled").val() === "true");
-                GM_setValue("tag-checker-enabled", options.tag_checker.enabled);
-                (options.tag_checker.enabled ? TagChecker.enable : TagChecker.disable).apply(TagChecker);
-
-                options.tag_checker.autocorrect.enabled = (dialog.find("#tag-checker-autocorrect-enabled").val() === "true");
-                GM_setValue("tag-checker-autocorrect-enabled", options.tag_checker.autocorrect.enabled);
-                // Do nothing: tag checker reads the options object directly 
-
-                options.oneup.enabled = (dialog.find("#1up-enabled").val() === "true");
-                GM_setValue("1up-enabled", options.oneup.enabled);
-                (options.oneup.enabled ? OneUp.enable : OneUp.disable).apply(OneUp);
-
-                log.info("Stored options:", options)
-
-                dialog.dialog("close");
-            },
-            Cancel: () => dialog.dialog("close")
-        }
-    });
-}
-*/
 function* array_chunks(arr, n) {
     for (let i = 0; i < arr.length; i += n) {
         yield arr.slice(i, i + n);
@@ -258,6 +264,7 @@ function* array_chunks(arr, n) {
 function search_items(endpoint, search_data, attributes) {
     return new Promise(async (resolve, reject) => {
         const PAGE_SIZE = 1000;
+        const MAX_GET_LENGTH = 96;
         let last_id = 0;
         let result = [];
 
@@ -265,50 +272,52 @@ function search_items(endpoint, search_data, attributes) {
             attributes.push("id");
         }
 
-        const request_data = {
-            _method: "GET",
+        const base_request_data = {
             limit: PAGE_SIZE,
             search: search_data,
             only: attributes.join(","),
         };
 
         for (;;) {
-            request_data["page"] = `a${last_id}`
-            log.info("POST", endpoint, request_data);
+            let data = base_request_data;
+            data["page"] = `a${last_id}`;
 
-            let res = await fetch(`/${endpoint}.json`, {
-                method: "POST",
-                body: JSON.stringify(request_data),
-                headers: {
-                    "X-HTTP-Method-Override": "get",
-                    "Content-Type": "application/json"
-                }
+            let method = "GET";
+
+            if ($.param(data).length > MAX_GET_LENGTH) {
+                method = "POST";
+                data["_method"] = "get";
+            }
+            log.info(method, endpoint, data);
+
+            let res = await $.ajax(`/${endpoint}.json`, {
+                method,
+                dataType: "json",
+                data
             });
 
-            if (!res.ok) {
-                return reject(`Error: ${response.status}`);
-            }
-
-            let new_items = await res.json();
-
-            for (const item of new_items) {
+            for (const item of res) {
                 if (item.id > last_id) {
                     last_id = item.id;
                 }
             }
 
-            result = result.concat(new_items);
+            result = result.concat(res);
 
-            if (new_items.length < PAGE_SIZE) {
+            if (res.length < PAGE_SIZE) {
                 return resolve(result);
             }
         }
     });
 }
 
-// GM_registerMenuCommand("Open settings", open_settings, { title: "Open settings menu" });
+GM_registerMenuCommand("Settings", _ => Options.open_dialog(), { title: "Open settings menu" });
 
 const style = `
+#awoo-options-form :focus {
+    outline: none;
+}
+
 #awoo-check-tags {
     margin: 0 1em;
     border: none;
