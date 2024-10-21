@@ -17,6 +17,62 @@
 
 "use strict";
 
+const DEFAULT_REPLACEMENTS = [
+    { type: "regex", search: "(?<=.+[_|-])shrit", replace: "shirt" },
+    { type: "regex", search: "(?<!t)-(?=shirt)", replace: "_" },
+
+    { type: "regex", search: "(?<=.+[_|-])skrit", replace: "skirt" },
+    { type: "regex", search: "(?<!half)-(?=skirt)", replace: "_" },
+
+    { type: "regex", search: "(?<=.+[_|-])naisl", replace: "nails" },
+    { type: "regex", search: "(?<=.+)-(?=nails)", replace: "_" },
+
+    { type: "regex", search: "(?<=.+)-(?=sweater)", replace: "_" },
+    
+    { type: "regex", search: "(?<=.+[_|-])shrots", replace: "shorts" },
+    { type: "regex", search: "(?<=.+)-(?=shorts)", replace: "_" },
+    
+    { type: "regex", search: "(?<=.+)-(?=eyes)", replace: "_" },
+    { type: "regex", search: "(?<=.+)-(?=hair)", replace: "_" },
+    { type: "regex", search: "(?<=.+)-(?=dress)", replace: "_" },
+    { type: "regex", search: "(?<=.+)-(?=jacket)", replace: "_" },
+    { type: "regex", search: "(?<=.+)-(?=ribbon)", replace: "_" },
+    { type: "regex", search: "(?<=.+)-(?=hat)", replace: "_" },
+    { type: "regex", search: "(?<=.+)-(?=necktie)", replace: "_" },
+    { type: "regex", search: "(?<=(.+){2,})-(?=bow)", replace: "_" },
+    { type: "regex", search: "(?<=.+)-(?=brooch)", replace: "_" },
+    { type: "regex", search: "(?<=.+)-(?=belt)", replace: "_" },
+    { type: "regex", search: "(?<=.+)-(?=cardigan)", replace: "_" },
+    { type: "regex", search: "(?<=.+)-(?=corset)", replace: "_" },
+    { type: "regex", search: "(?<=.+)-(?=coat)", replace: "_" },
+    
+    { type: "regex", search: "colalred(?=[_|-].+)", replace: "collared" },
+
+    { type: "regex", search: "(?<=.+[_|-])haiar", replace: "hair" },
+    { type: "regex", search: "(?<=.+[_|-])hairl", replace: "hair" },
+    { type: "regex", search: "(?<=.+[_|-])eyesl", replace: "eyes" },
+    { type: "regex", search: "(?<=.+[_|-])eys", replace: "eyes" },
+    { type: "regex", search: "(?<=.+[_|-])flwoer", replace: "flower" },
+    { type: "regex", search: "blakc(?=[_|-].+)", replace: "black" },
+
+    { type: "simple", search: "outdoros", replace: "outdoors" },
+    { type: "simple", search: "colalred_shirt", replace: "collared_shirt" },
+    { type: "simple", search: "earrinsg", replace: "earrings" },
+    { type: "simple", search: "sweatdorp", replace: "sweatdrop" },
+    { type: "simple", search: "tongue-out", replace: "tongue_out" },
+    { type: "simple", search: "character-name", replace: "character_name" },
+    { type: "simple", search: "thigh-strap", replace: "thigh_strap" },
+    { type: "simple", search: "anger-vein", replace: "anger_vein" },
+    { type: "simple", search: "bleu_eyes", replace: "blue_eyes" },
+    { type: "simple", search: "hicket", replace: "hickey" },
+    { type: "simple", search: "colared_shirt", replace: "collared_shirt" },
+    { type: "simple", search: "lbush", replace: "blush" },
+    { type: "simple", search: "cat_eras", replace: "cat_ears" },
+    { type: "simple", search: "ponytial", replace: "ponytail" },
+    { type: "simple", search: "sidelocsk", replace: "sidelocks" },
+    { type: "simple", search: "film-grain", replace: "film_grain" }
+];
+
 const OPTIONS_SCHEMA = {
     "oneup.enabled": {
         caption: "Easy 1up",
@@ -32,6 +88,11 @@ const OPTIONS_SCHEMA = {
         caption: "Autocorrect",
         defval: true,
         type: "enable",
+    },
+    "tag_checker.autocorrect.dictionary": {
+        caption: "Autocorrect dictionary",
+        defval: DEFAULT_REPLACEMENTS,
+        type: "custom"
     }
 }
 
@@ -80,12 +141,12 @@ class Options {
         this.#callbacks.push({ key, cb });
     }
 
-    static set(path, val) {
-        const old = this.#get_key(this.#options, path);
+    static set(path, val, create_path = false) {
+        const old = create_path ? null : this.#get_key(this.#options, path);
 
         if (old !== val) {
             log.info(`Updating ${path} from`, old, "to", val);
-            this.#set_key(this.#options, path, val);
+            this.#set_key(this.#options, path, val, create_path);
             localStorage.setItem("awoo-options", JSON.stringify(this.#options));
 
             for (const { key, cb } of this.#callbacks) {
@@ -100,11 +161,24 @@ class Options {
         return this.#get_key(this.#options, path);
     }
 
+    static exists(path) {
+        let target = this.#options;
+        for (const key of path.split(".")) {
+            if (!target.hasOwnProperty(key)) {
+                return false;
+            }
+
+            target = target[key];
+        }
+
+        return true;
+    }
+
     static #get_key(obj, path) {
         let target = obj;
         for (const key of path.split(".")) {
             if (!target.hasOwnProperty(key)) {
-                throw new Error(`Key ${el} not found (path: ${path})`);
+                throw new Error(`Key ${key} not found (path: ${path})`);
             }
 
             target = target[key];
@@ -113,20 +187,24 @@ class Options {
         return target;
     }
 
-    static #set_key(obj, path, val) {
+    static #set_key(obj, path, val, create = false) {
         let target = obj;
         const full_path = path.split(".");
         for (const key of full_path.slice(0, -1)) {
             if (!target.hasOwnProperty(key)) {
-                throw new Error(`Key ${el} not found (path: ${path})`);
+                if (!create) {
+                    throw new Error(`Key ${el} not found (path: ${path})`);
+                } else {
+                    target[key] = {};
+                }
             }
 
             target = target[key];
         }
 
         
-        if (!target.hasOwnProperty(full_path.slice(-1))) {
-            throw new Error(`Key ${el} not found (path: ${path})`);
+        if (!create && !target.hasOwnProperty(full_path.slice(-1))) {
+            throw new Error(`Key ${full_path.slice(-1)} not found (path: ${path})`);
         }
 
         target[full_path.slice(-1)] = val;
@@ -163,6 +241,15 @@ class Options {
             localStorage.setItem("awoo-options", JSON.stringify(this.#options));
         } else {
             this.#options = JSON.parse(val);
+        }
+
+        for (const [key, desc] of Object.entries(OPTIONS_SCHEMA)) {
+            if (!this.exists(key)) {
+                log.info("Default initializing " + key + " to ", desc.defval);
+                this.set(key, desc.defval, true);
+            } else {
+                log.info(key + " exists");
+            }
         }
 
         window.addEventListener("storage", (e) => {
@@ -476,7 +563,7 @@ const CATEGORY_TO_NAME = {
     "3": "copyright",
     "4": "character",
     "5": "meta"
-}
+};
 
 const SPECIAL_TAGS = [
     "rating:", "parent:", "child:", "source:",
@@ -490,7 +577,8 @@ const TAG_FORMAT_ORDER = [ "artist", "copyright", "character", "general", "meta"
 
 class TagCheckerFeature {
     constructor() {
-        this.post_btn = $(".upload-form input[type='submit'], .edit_post input[type='submit']");
+        this.form = $(".upload-form, #edit .edit_post");
+        this.post_btn = this.form.find("input[type='submit']");
         this.check_btn = $("<input>", {
             type: "button",
             "class": "button-secondary button-sm",
@@ -504,7 +592,6 @@ class TagCheckerFeature {
             }
         });
 
-        this.form = $(".upload-form, .edit_post");
         this.tags_field = $("#upload_tag_string, #post_tag_string");
 
         this.form_submit_handler = async e => {
@@ -589,6 +676,49 @@ class TagCheckerFeature {
         );
     }
 
+    static #correct_tag(tag) {
+        for (const { type, search, replace } of Options.get("tag_checker.autocorrect.dictionary")) {
+            switch (type) {
+                case "simple":
+                    if (tag === search) {
+                        return { corrected: true, tag: replace };
+                    }
+                    break;
+                case "regex":
+                    const regex = new RegExp(search, "i");
+                    if (regex.test(tag)) {
+                        return { corrected: true, tag: tag.replace(regex, replace) };
+                    }
+                    break;
+            }
+        }
+
+        return { corrected: false, tag: tag };
+    }
+
+    static #correct_tags(tags) {
+        let res = tags;
+
+        let corrections = 0;
+        do {
+            let tmp_res = [];
+            corrections = 0;
+            for (const old_tag of res) {
+                const { corrected, tag } = this.#correct_tag(old_tag);
+
+                if (corrected) {
+                    corrections += 1;
+                }
+
+                tmp_res.push(tag);
+            }
+
+            res = tmp_res;
+        } while (corrections > 0);
+
+        return res;
+    }
+
     static #categorize_tags(tags) {
         let special_tags = new Set();
         let normal_tags = new Set();
@@ -598,7 +728,7 @@ class TagCheckerFeature {
             const is_negated = (tag[0] === "-");
 
             if (tag.includes(":")) {
-                if (SPECIAL_TAGS.find(prefix => tag.startsWith(prefix) && tag.length > prefix.length)) {
+                if (SPECIAL_TAGS.find(prefix => (is_negated ? tag.slice(1) : tag).startsWith(prefix) && tag.length > prefix.length)) {
                     special_tags.add(tag);
                     continue;
                 }
@@ -748,7 +878,6 @@ class TagCheckerFeature {
         notice_fields.push(...not_found_fields);
 
         const inputs = $(notice_fields.map(e => e[0])).find("input[data-autocomplete='tag']");
-        log.info(inputs);
         inputs.autocomplete({
             source: async (request, respond) => respond(await Danbooru.Autocomplete.autocomplete_source(request.term, "tag")),
             close: (e) => {
@@ -759,6 +888,7 @@ class TagCheckerFeature {
         });
         inputs.on("focus", e => $(e.target).data("uiAutocomplete").search(e.target.value));
         inputs.on("input", _ => this.#update_tag_string());
+        // inputs.on("keydown", console.log);
 
         const notice = $("<div></div>", {
             id: "awoo-tag-checker-notice",
@@ -795,8 +925,13 @@ class TagCheckerFeature {
             not_found: [],
         }
 
-        const tags = await this.#get_tags();
+        let tags = await this.#get_tags();
+
         let { normal: normal_tags, special: special_tags, removed: removed_tags } = TagCheckerFeature.#categorize_tags(tags);
+
+        if (Options.get("tag_checker.autocorrect.enabled")) {
+            normal_tags = TagCheckerFeature.#correct_tags(normal_tags);
+        }
         
         /* Store them with the leading "-" */
         this.tag_map.not_found = removed_tags.map(tag => "-" + tag);
