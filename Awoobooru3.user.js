@@ -7,7 +7,7 @@
 // @grant       GM_getValue
 // @grant       GM_setValue
 // @grant       GM_addStyle
-// @version     3.0.0b
+// @version     3.0.0c
 // @author      TypeA2
 // @description Various utilities to make life easier
 // @downloadURL https://github.com/TypeA2/booru-scripts/raw/refs/heads/master/Awoobooru3.user.js
@@ -934,7 +934,7 @@ class TagCheckerFeature {
         }
         
         /* Store them with the leading "-" */
-        this.tag_map.not_found = removed_tags.map(tag => "-" + tag);
+        this.tag_map.removed = removed_tags.map(tag => "-" + tag);
 
         const found_tags = await this.#retrieve_tags(normal_tags);
 
@@ -965,7 +965,7 @@ class TagCheckerFeature {
                     const rating = tag.substring(7, 8).toLowerCase();
                     if ("gsqe".includes(rating)) {
                         $(`#post_rating_${rating}`).prop("checked", true);
-                        continue;
+                        /* Keep rating: metatag in tag string */
                     }
                     /* Fallthrough */
                 } else if (tag.startsWith("source:")) {
@@ -973,7 +973,7 @@ class TagCheckerFeature {
                     continue;
                 } else if (tag.startsWith("parent:")) {
                     $("#post_parent_id").val(tag.substring(7));
-                    continue;
+                    /* Keep parent: metatag in tag string */
                 }
 
                 this.tag_map.special.push(tag);
