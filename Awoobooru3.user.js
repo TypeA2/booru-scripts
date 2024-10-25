@@ -7,7 +7,7 @@
 // @grant       GM_getValue
 // @grant       GM_setValue
 // @grant       GM_addStyle
-// @version     3.0.0c
+// @version     3.0.0
 // @author      TypeA2
 // @description Various utilities to make life easier
 // @downloadURL https://github.com/TypeA2/booru-scripts/raw/refs/heads/master/Awoobooru3.user.js
@@ -92,7 +92,22 @@ const OPTIONS_SCHEMA = {
     "tag_checker.autocorrect.dictionary": {
         caption: "Autocorrect dictionary",
         defval: DEFAULT_REPLACEMENTS,
-        type: "custom"
+        type: "table",
+        columns: [
+            {
+                type: "select",
+                options: [ "simple", "regex" ],
+                key: "type",
+            },
+            {
+                type: "regex",
+                key: "search"
+            },
+            {
+                type: "text",
+                key: "replace"
+            }
+        ]
     }
 }
 
@@ -270,6 +285,25 @@ class Options {
     static #dialog_inputs() {
         let res = [];
 
+        res.push($("<div></div>", {
+            "class": "input",
+            html: $("<button></button>", {
+                id: "awoo-option-load-default",
+                text: "Load default",
+                type: "Button",
+                click: _ => {
+                    if (confirm("Loading default settings, are you sure?")) {
+                        this.#options = this.default_options;
+                        localStorage.setItem("awoo-options", JSON.stringify(this.#options));
+
+                        /* Re-open the dialog to update all values */
+                        $("#awoo-options-dialog").on("dialogclose", _ => this.open_dialog());
+                        $("#awoo-options-dialog").dialog("close");
+                    }
+                }
+            })
+        }))
+
         for (const [key, desc] of Object.entries(OPTIONS_SCHEMA)) {
             const row = $("<div></div>", {
                 "class": "input"
@@ -306,6 +340,47 @@ class Options {
                         html: [ enable_opt, disable_opt ]
                     }));
                     break;
+
+                case "table":
+                    const edit_btn = $("<button></button>", {
+                        type: "button",
+                        "data-option-path": key,
+                        id: "awoo-option-" + key,
+                        class: "awoo-option-input",
+                        text: "Edit",
+                        click: e => this.#table_dialog(desc, $(e.target)),
+                        data: {
+                            value: this.get(key),
+                            converter: el => $(el).data("value")
+                        },
+                    });
+
+                    row.append(edit_btn);
+
+                    row.append($("<button></button>", {
+                        type: "button",
+                        id: "awoo-option-export-" + key,
+                        text: "Export",
+                        click: _ => prompt(desc.caption, JSON.stringify(edit_btn.data("value")))
+                    }));
+
+                    row.append($("<button></button>", {
+                        type: "button",
+                        id: "awoo-option-import-" + key,
+                        text: "Import",
+                        click: _ => {
+                            const val = prompt(desc.caption);
+
+                            if (val) {
+                                try {
+                                    edit_btn.data("value", JSON.parse(val));
+                                } catch (_) {
+                                    alert("Invalid JSON");
+                                }
+                            }
+                        }
+                    }));
+                    break;
             }
 
             res.push(row);
@@ -314,8 +389,138 @@ class Options {
         return res;
     }
 
+    static #table_row(desc, val, i) {
+        const row = $("<tr></tr>", {
+            "data-row-idx": i
+        });
+
+        const columns = [];
+
+        for (const col of desc.columns) {
+            let el;
+            switch (col.type) {
+                case "select":
+                    el = $("<select></select>", {
+                        "data-col-key": col.key,
+                        class: "awoo-option-input"
+                    });
+
+                    el.append(col.options.map(v => $("<option></option>", {
+                        value: v,
+                        text: v,
+                        selected: val[col.key] == v
+                    })));
+
+                    break;
+
+                case "regex":
+                    el = $("<input>", {
+                        type: "text",
+                        "data-col-key": col.key,
+                        class: "awoo-option-input",
+                        value: val[col.key]
+                    });
+
+                    el.on("input", e => {
+                        try {
+                            const _ = new RegExp(e.target.value, "i");
+                            $(e.target).removeClass("awoo-invalid-input");
+                        } catch (_) {
+                            $(e.target).addClass("awoo-invalid-input");
+                        }
+
+                        $("#awoo-table-dialog-submit").prop("disabled", $("#awoo-options-table-dialog .awoo-invalid-input").length > 0);
+                    });
+                    break;
+
+                case "text":
+                    el = $("<input>", {
+                        type: "text",
+                        "data-col-key": col.key,
+                        class: "awoo-option-input",
+                        value: val[col.key]
+                    });
+                    break;
+            }
+
+            columns.push($("<td></td>", {
+                html: el
+            }));
+        }
+        
+        row.append($("<th></th>", {
+            text: `[${i}]`
+        }));
+
+        row.append(columns);
+
+        return row;
+    }
+
+    static #table_dialog(desc, el) {
+        const rows = $(el).data("value").map((val, i) => this.#table_row(desc, val, i));
+
+        const dialog_body = $("<div></div>", {
+            id: "awoo-options-table-dialog",
+            html: [
+                $("<table></table>", {
+                    class: "simple_form",
+                    id: "awoo-options-table-form",
+                    html: rows,
+                })
+            ]
+        });
+
+        const dialog = dialog_body.dialog({
+            title: desc.caption,
+            width: 1280,
+            modal: true,
+            buttons: [
+                {
+                    text: "Add row",
+                    click: () => {
+                        const default_object = {};
+                        for (const col of desc.columns) {
+                            default_object[col.key] = "";
+                        }
+
+                        $("#awoo-options-table-form").append(this.#table_row(desc, default_object, +$("#awoo-options-table-form tr:last-child").attr("data-row-idx") + 1));
+                    }
+                },
+                {
+                    text: "Submit",
+                    id: "awoo-table-dialog-submit",
+                    click: () => {
+                        const res = [];
+                        log.info($("#awoo-options-table-form tr"));
+                        for (const row of $("#awoo-options-table-form tr")) {
+                            const val = {};
+                            for (const input of $(row).find(".awoo-option-input")) {
+                                val[input.dataset.colKey] = input.value;
+                            }
+                            res.push(val);
+                        }
+                        $(el).data("value", res);
+                        dialog.dialog("close");
+                        dialog.remove();
+                    },
+                },
+                {
+                    text: "Cancel",
+                    click: () => {
+                        dialog.dialog("close");
+                        dialog.remove();
+                    }
+                }
+            ]
+        });
+
+        dialog.dialog();
+    }
+
     static open_dialog() {
         const dialog_body = $("<div></div>", {
+            id: "awoo-options-dialog",
             html: [
                 $("<form></form>", {
                     class: "simple_form",
@@ -405,6 +610,10 @@ const style = `
     outline: none;
 }
 
+#awoo-options-form button {
+    margin-right: 0.2em;
+}
+
 #awoo-check-tags {
     margin: 0 1em;
     border: none;
@@ -436,6 +645,14 @@ input.awoo-working {
 #post_tag_string.awoo-disabled {
     color: var(--form-input-border-color);
     cursor: text;
+}
+
+#awoo-options-table-dialog th, #awoo-options-table-dialog td {
+    padding: 0.1em;
+}
+
+.awoo-invalid-input, .awoo-invalid-input:active {
+    background-color: var(--notice-error-background);
 }
 `;
 
@@ -889,6 +1106,7 @@ class TagCheckerFeature {
         inputs.on("focus", e => $(e.target).data("uiAutocomplete").search(e.target.value));
         inputs.on("input", _ => this.#update_tag_string());
         // inputs.on("keydown", console.log);
+        // inputs.on("blur", console.log);
 
         const notice = $("<div></div>", {
             id: "awoo-tag-checker-notice",
