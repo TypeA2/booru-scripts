@@ -1,0 +1,33 @@
+/* global css */
+#awoo-tag-list {
+    max-width: 100%;
+}
+
+.awoo-tag {
+    margin: 1px;
+
+    a {
+        fill: var(--link-color)
+    }
+}
+
+.awoo-tag-error {
+    padding: 0.2em;
+
+    &:not(:last-child) {
+        border-bottom: 1px solid var(--form-input-border-color);
+    }
+}
+
+#awoo-error-list, .awoo-tag-unknown, .awoo-tag-deprecated, .awoo-tag-error {
+    background-color: var(--notice-error-background);
+}
+
+#awoo-copy-controls {
+    display: block;
+}
+
+#awoo-override-check-container {
+    margin-bottom: 0 !important;
+    margin-left: 0.5em;
+}
