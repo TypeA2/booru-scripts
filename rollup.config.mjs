@@ -8,7 +8,6 @@ import { readPackageUp } from 'read-package-up';
 import { defineConfig } from 'rollup';
 import postcssPlugin from 'rollup-plugin-postcss';
 import userscript from 'rollup-plugin-userscript';
-import terser from '@rollup/plugin-terser';
 
 const { packageJson } = await readPackageUp();
 const extensions = ['.ts', '.tsx', '.mjs', '.js', '.jsx'];
@@ -24,7 +23,7 @@ if (is_production) {
 
 export default defineConfig(
     Object.entries({
-        'Awoobooru3': 'src/Awoobooru3/index.ts',
+        'Awoobooru4': 'src/Awoobooru4/index.ts',
     }).map(([name, entry]) => ({
         input: entry,
         plugins: [

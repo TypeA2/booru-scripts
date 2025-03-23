@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name        Awoobooru 3
+// @name        Awoobooru 4
 // @namespace   https://github.com/TypeA2/booru-scripts
 // @match       *://*.donmai.us/*
 // @match       *://cos.lycore.co/*
@@ -14,8 +14,8 @@
 // @require     https://cdn.jsdelivr.net/npm/@violentmonkey/ui@0.7
 // @require     https://cdn.jsdelivr.net/npm/@violentmonkey/dom@2/dist/solid.min.js
 // @require     https://cdn.jsdelivr.net/npm/panzoom@9.4.3/dist/panzoom.min.js
-// @downloadURL https://github.com/TypeA2/booru-scripts/raw/refs/heads/master/Awoobooru3.user.js
-// @updateURL   https://github.com/TypeA2/booru-scripts/raw/refs/heads/master/Awoobooru3.user.js
+// @downloadURL https://github.com/TypeA2/booru-scripts/raw/refs/heads/master/Awoobooru3/dist/Awoobooru3.user.js
+// @updateURL   https://github.com/TypeA2/booru-scripts/raw/refs/heads/master/Awoobooru3/dist/Awoobooru3.user.js
 // @run-at      document-end
 // ==/UserScript==
 

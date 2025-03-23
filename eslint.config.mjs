@@ -19,7 +19,7 @@ export default [
 		},
 	},
 	{
-		ignores: ['dist/'],
+		ignores: [ "**/*.js" ],
 	},
 	{
 		rules: {
