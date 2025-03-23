@@ -3,7 +3,7 @@
 // @namespace   https://github.com/TypeA2/booru-scripts
 // @match       *://*.donmai.us/*
 // @match       *://cos.lycore.co/*
-// @version     4.0.0b
+// @version     4.0.1b
 // @author      TypeA2
 // @description Various utilities to make life easier
 // @require     https://cdn.jsdelivr.net/npm/@violentmonkey/dom@2
@@ -343,6 +343,7 @@ class MetaTag extends Tag {
   }
 }var _TagRegistry;
 const logger$5 = new Logger("TagRegistry");
+const PARENT_CHILD_TEXT_ARGS = ["active", "any", "appealed", "banned", "deleted", "flagged", "modqueue", "none", "pending", "unmoderated"];
 class TagRegistry {
   constructor() {}
   static parse_tag(tag) {
@@ -359,7 +360,7 @@ class TagRegistry {
             break;
           case "parent":
           case "child":
-            if (!/^\d+$/.test(name)) {
+            if (!/^\d+$/.test(name) && !PARENT_CHILD_TEXT_ARGS.includes(name)) {
               return null;
             }
             break;

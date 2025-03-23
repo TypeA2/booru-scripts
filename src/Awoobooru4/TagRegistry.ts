@@ -5,6 +5,13 @@ import { array_chunks } from "./Util";
 
 const logger = new Logger("TagRegistry");
 
+const PARENT_CHILD_TEXT_ARGS = [
+    "active", "any", "appealed",
+    "banned", "deleted", "flagged",
+    "modqueue", "none", "pending",
+    "unmoderated"
+];
+
 export default abstract class TagRegistry {
     private constructor() { }
 
@@ -24,7 +31,7 @@ export default abstract class TagRegistry {
     
                     case "parent":
                     case "child":
-                        if (!/^\d+$/.test(name)) {
+                        if (!/^\d+$/.test(name) && !PARENT_CHILD_TEXT_ARGS.includes(name)) {
                             return null;
                         }
                         break;
