@@ -10,6 +10,7 @@ declare namespace Danbooru {
 
     declare namespace RelatedTag {
         function update_selected(e: InputEvent): void;
+        function toggle_tag(e: InputEvent): void;
     }
 
     declare namespace CurrentUser {

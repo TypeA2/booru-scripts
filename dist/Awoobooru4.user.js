@@ -3,7 +3,7 @@
 // @namespace   https://github.com/TypeA2/booru-scripts
 // @match       *://*.donmai.us/*
 // @match       *://cos.lycore.co/*
-// @version     4.0.1b
+// @version     4.0.2b
 // @author      TypeA2
 // @description Various utilities to make life easier
 // @require     https://cdn.jsdelivr.net/npm/@violentmonkey/dom@2
@@ -19,7 +19,7 @@
 // @grant       GM_setValue
 // ==/UserScript==
 
-(function(web,solidJs,store){'use strict';var css_248z$2 = "#awoo-tag-list{max-width:100%}.awoo-tag{margin:1px}.awoo-tag a{fill:var(--link-color)}.awoo-tag-error{padding:.2em}.awoo-tag-error:not(:last-child){border-bottom:1px solid var(--form-input-border-color)}#awoo-error-list,.awoo-tag-deprecated,.awoo-tag-error,.awoo-tag-unknown{background-color:var(--notice-error-background)}#awoo-copy-controls{display:block}#awoo-override-check-container{margin-bottom:0!important;margin-left:.5em}";class Logger {
+(function(web,solidJs,store){'use strict';var css_248z$2 = "#awoo-tag-list{max-width:100%}.awoo-tag{margin:1px}.awoo-tag a{fill:var(--link-color)}.awoo-tag-error{padding:.2em}.awoo-tag-error:not(:last-child){border-bottom:1px solid var(--form-input-border-color)}#awoo-error-list,.awoo-tag-deprecated,.awoo-tag-error,.awoo-tag-unknown{background-color:var(--notice-error-background)}#awoo-copy-controls{display:block}#awoo-override-check-container{margin-bottom:0!important;margin-left:.5em}#awoo-tag-list:has(>ul:empty){display:none}";class Logger {
   log(func, ...args) {
     func.apply(null, [`[${this.instance_name}]`, ...args]);
   }
@@ -161,200 +161,72 @@ const CATEGORY_TO_NAME = {
 function sanitize_tag_string(tags) {
   return tags.split(/([\s\n])/).map(tag => tag.toLowerCase()).filter(s => /\S/.test(s)).sort();
 }
+/*
+export abstract class Tag {
+    private _tag_string: string;
+    private _is_added: boolean;
+
+    protected constructor(tag_string: string, is_added: boolean) {
+        this._tag_string = tag_string;
+        this._is_added = is_added;
+    }
+
+    public toString(): string {
+        return this.tag_string();
+    }
+
+    /* Full name to be used in the tag string *
+    public tag_string(): string { return this._tag_string; }
+
+    /* Used to check for uniqueness, discarding any modifiers *
+    public abstract unique_name(): string;
+
+    /* Friendly display name *
+    public abstract display_name(): string;
+
+    /* Prefix-less tagname *
+    public abstract search_string(): string;
+
+    /* Properties applied to the tag *
+    public abstract render_settings(): TagRenderSettings;
+};*/
+
+const PARENT_CHILD_TEXT_ARGS = ["active", "any", "appealed", "banned", "deleted", "flagged", "modqueue", "none", "pending", "unmoderated"];
 class Tag {
-  constructor(tag_string) {
-    this._tag_string = tag_string;
+  /* Is this tag being added or removed */
+
+  constructor(is_add) {
+    this._is_add = is_add;
+  }
+  get is_add() {
+    return this._is_add;
   }
   toString() {
-    return this.tag_string();
+    return this.display_name();
   }
-
-  /* Full name to be used in the tag string */
-  tag_string() {
-    return this._tag_string;
-  }
-
-  /* Used to check for uniqueness, discarding any modifiers */
-
-  /* Friendly display name */
-
-  /* Prefix-less tagname */
-
-  /* Properties applied to the tag */
-}
-class PendingTag extends Tag {
-  constructor(tag) {
-    super(tag);
-  }
-  unique_name() {
-    return this.tag_string();
-  }
-  display_name() {
-    return this.tag_string();
-  }
-  search_string() {
-    return this.tag_string();
-  }
-  render_settings() {
-    return {
-      class_string: "awoo-tag-pending",
-      can_remove: true,
-      properties: {}
-    };
-  }
-  as_not_found() {
-    return new NotFoundTag(this.tag_string());
-  }
-}
-class NotFoundTag extends Tag {
-  constructor(tag) {
-    super(tag);
-  }
-  unique_name() {
-    return this.tag_string();
-  }
-  display_name() {
-    return this.tag_string();
-  }
-  search_string() {
-    return this.tag_string();
-  }
-  render_settings() {
-    return {
-      class_string: "awoo-tag-unknown",
-      can_remove: true,
-      properties: {}
-    };
-  }
-}
-class FullDataTag extends Tag {
-  get category() {
-    return this.__category;
-  }
-  get deprecated() {
-    return this.__deprecated;
-  }
-  constructor(name, category, is_deprecated) {
-    super(name);
-    this.__category = category;
-    this.__deprecated = is_deprecated;
-  }
-  unique_name() {
-    return this.tag_string();
-  }
-  display_name() {
-    return this.tag_string();
-  }
-  search_string() {
-    return this.tag_string();
-  }
-  render_settings() {
-    return {
-      class_string: `awoo-tag-${this.category} ${this.deprecated ? "awoo-tag-deprecated" : ""}`,
-      can_remove: true,
-      properties: {
-        "data-tag-category": this.category,
-        "data-tag-is-deprecated": this.deprecated ? "true" : "false"
-      }
-    };
-  }
-}
-class NewTag extends Tag {
-  get category() {
-    return this._category;
-  }
-  get tag() {
-    return this._tag;
-  }
-  constructor(category, tag) {
-    super(category + ":" + tag);
-    this._category = PREFIX_TO_CATEGORY[category];
-    this._tag = tag;
-  }
-  unique_name() {
-    return this.tag;
-  }
-  display_name() {
-    /* Don't show prefix on current artist */
-    if (this.tag === $(".source-data-content a.tag-type-1").text()) {
-      return this.tag;
-    }
-    return this.category + ":" + this.tag;
-  }
-  search_string() {
-    return this.tag;
-  }
-  render_settings() {
-    return {
-      class_string: `awoo-tag-${this.category}`,
-      can_remove: true,
-      properties: {
-        "data-category": this.category
-      }
-    };
-  }
-}
-class MetaTag extends Tag {
-  get kind() {
-    return this._kind;
-  }
-  get value() {
-    return this._value;
-  }
-  constructor(kind, value) {
-    super(kind + ":" + value);
-    this._kind = kind;
-    this._value = value;
-  }
-  unique_name() {
-    switch (this.kind) {
-      /* These can appear multiple times */
-      case "child":
-      case "pool":
-      case "newpool":
-      case "favgroup":
-        return this.kind + ":" + this.value;
-    }
-    return this.kind;
-  }
-  display_name() {
-    switch (this.kind) {
-      case "rating":
-        return `${this.kind}:${this.value[0]}`;
-    }
-    return this.kind + ":" + this.value;
-  }
-  search_string() {
-    return this.tag_string();
-  }
-  render_settings() {
-    return {
-      class_string: "awoo-tag-meta-tag",
-      can_remove: this.kind !== "rating",
-      properties: {
-        "data-meta-category": this.kind,
-        "data-meta-value": this.value
-      }
-    };
-  }
-}function* array_chunks(arr, n) {
-  for (let i = 0; i < arr.length; i += n) {
-    yield arr.slice(i, i + n);
-  }
-}var _TagRegistry;
-const logger$5 = new Logger("TagRegistry");
-const PARENT_CHILD_TEXT_ARGS = ["active", "any", "appealed", "banned", "deleted", "flagged", "modqueue", "none", "pending", "unmoderated"];
-class TagRegistry {
-  constructor() {}
   static parse_tag(tag) {
-    if (tag.indexOf(":") > 1 && TagPrefixes.includes(tag.split(":", 1)[0])) {
-      const [prefix, name] = tag.split(":");
+    if (tag instanceof Tag) {
+      return tag;
+    }
+    const is_add = tag[0] !== "-";
+    const raw_tag = is_add ? tag : tag.slice(1);
+
+    /* If it's a valid tag prefix (sometimes normal tags contain a :) */
+    if (raw_tag.indexOf(":") > 1 && TagPrefixes.includes(raw_tag.split(":", 1)[0])) {
+      const [prefix, name] = raw_tag.split(":", 2);
       if (prefix in PREFIX_TO_CATEGORY) {
-        return new NewTag(prefix, name);
+        /* Tag with explicit category */
+        return new NormalTag(name, PREFIX_TO_CATEGORY[prefix], false, true, is_add);
       } else if (MetaTagCategories.includes(prefix)) {
+        /**
+         * A few considerations:
+         * * `rating` cannot be negated
+         * * `parent` is handled locally (TODO: maybe don't do this?)
+         * * All other negated metatags are passed through as-is
+         */
         switch (prefix) {
           case "rating":
-            if (!"gsqe".includes(name[0])) {
+            if (!is_add || !"gsqe".includes(name[0])) {
               return null;
             }
             break;
@@ -365,71 +237,295 @@ class TagRegistry {
             }
             break;
         }
-        return new MetaTag(prefix, name);
+        return new MetaTag(prefix, prefix === "rating" ? name[0] : name, is_add);
       }
       return null;
     }
-    if (this.has_tag(tag)) {
-      return this.get_tag(tag);
+
+    /* If the tag is already present somewhere on the page we can now it's type */
+    const el = $(`[data-tag-name="${raw_tag}"]`);
+    if (el.length > 0) {
+      for (const cls of el[0].classList) {
+        if (cls.startsWith("tag-type-")) {
+          return new NormalTag(raw_tag, CATEGORY_TO_NAME[cls[9]], false, false, is_add);
+        }
+      }
     }
-    return new PendingTag(tag);
+    return new NormalTag(raw_tag, "unknown", false, false, is_add);
   }
-  static has_tag(tag) {
-    return Object.prototype.hasOwnProperty.call(this._known_tags, tag);
+}
+
+/* Any normal tag, new or not */
+class NormalTag extends Tag {
+  constructor(tag_name, tag_category, is_deprecated, is_new, is_add) {
+    super(is_add);
+    this._tag_name = tag_name;
+    this._tag_category = tag_category;
+    this._is_deprecated = is_deprecated;
+    this.is_new = is_new;
   }
-  static _store_tag(tag) {
-    this._known_tags[tag.unique_name()] = tag;
+  get category() {
+    return this._tag_category;
   }
-  static store_tag(tag) {
-    logger$5.info("Storing", tag.tag_string(), tag);
-    this._store_tag(tag);
+  get is_deprecated() {
+    return this._is_deprecated;
   }
-  static store_tags(tags) {
-    logger$5.info("Storing", tags.map(t => t.tag_string()).join(", "));
-    tags.map(t => this._store_tag(t));
+  unique_name() {
+    return this._tag_name;
   }
-  static get_tag(tag) {
-    return this._known_tags[tag];
+  display_name() {
+    return this._tag_name;
   }
-  static async resolve_pending(cb) {
-    const tags = new Map(Object.entries(this._known_tags).filter(([_, t]) => t instanceof PendingTag));
-    if (tags.size === 0) {
-      {
+  tag_string() {
+    return `${this.is_add ? "" : "-"}${this.is_new ? this._tag_category + ":" : ""}${this._tag_name}`;
+  }
+  search_string() {
+    return this._tag_name;
+  }
+  class_string() {
+    if (this.is_new && this._tag_category === "unknown") {
+      return "awoo-tag-error";
+    }
+    return "";
+  }
+}
+
+/* Any meta tag, these do special things */
+class MetaTag extends Tag {
+  /* Metatags are a key/value pair */
+
+  constructor(key, value, is_add) {
+    super(is_add);
+    this._key = key;
+    this._value = value;
+  }
+  get key() {
+    return this._key;
+  }
+  get value() {
+    return this._value;
+  }
+  unique_name() {
+    switch (this._key) {
+      /* These may have only 1 instance */
+      case "parent":
+      case "locked":
+      case "rating":
+        return this._key;
+    }
+
+    /* Intentionally ignore `is_add` */
+    return `${this._key}:${this._value}`;
+  }
+  display_name() {
+    return `${this.is_add ? "" : "-"}${this._key}:${this._value}`;
+  }
+  tag_string() {
+    if (this.is_add) {
+      return `${this._key}:${this._value}`;
+    } else {
+      return `-${this._key}:${this._value}`;
+    }
+  }
+  search_string() {
+    return `${this._key}:${this._value}`;
+  }
+  class_string() {
+    return "awoo-tag-meta-tag";
+  }
+}const logger$5 = new Logger("TagList");
+const RESOLVE_DELAY = 500;
+class TagList {
+  constructor() {
+    this._state = store.createStore({});
+    this._pending = store.createStore({});
+
+    // TODO this breaks if more than 1 tag list exists (does it?)
+    /*setInterval(() => TagRegistry.resolve_pending(tags => {
+        batch(() => {
+            tags.forEach(tag => this._store_tag(tag));
+        });
+    }), RESOLVE_DELAY);*/
+    setInterval(async () => {
+      const tags = Object.values(this._pending[0]);
+      if (tags.length === 0) {
         return;
       }
-    }
-    logger$5.info("Resolving pending tags:", [...tags.keys()].join(", "));
-    const result = [];
-    for (const chunk of array_chunks([...tags.values().map(t => t.unique_name())], 1000)) {
-      const found_tags = await this._search_tags(chunk);
-      if (found_tags.length > 0) {
-        logger$5.info("Found", found_tags.map(t => t.tag_string()).join(", "));
-      }
-      result.push(...found_tags);
-      for (const tag of found_tags) {
-        tags.delete(tag.unique_name());
+      const res = await this._resolve_pending(tags);
+      const remaining_tags = {};
+      tags.forEach(tag => remaining_tags[tag.unique_name()] = tag);
+
+      // FIXME: This is inefficient, but batch() seems to break it somehow
+      res.forEach(tag => {
+        this._remove_pending(tag);
         this._store_tag(tag);
+        delete remaining_tags[tag.unique_name()];
+      });
+      Object.values(remaining_tags).forEach(tag => {
+        tag.is_new = true;
+        this._remove_pending(tag);
+        this._store_tag(tag);
+      });
+    }, RESOLVE_DELAY);
+  }
+  apply_tag(tag) {
+    tag = Tag.parse_tag(tag);
+
+    /* Metatags are handled separately */
+    if (tag instanceof MetaTag) {
+      switch (tag.unique_name()) {
+        case "parent":
+          {
+            if (!tag.is_add) {
+              /* Parent is being removed */
+              this._remove_tag(tag);
+              return;
+            }
+            break;
+          }
+      }
+
+      /* Store as normal */
+      this._store_tag(tag);
+      return;
+    }
+
+    /* Move to pending if already present */
+    if (this._has_tag(tag)) {
+      this._remove_tag(tag);
+    }
+    if (tag.is_add) {
+      /* Potentially overwrite existing pending tags */
+      this._store_pending(tag);
+    }
+  }
+  apply_tags(tags) {
+    solidJs.batch(() => {
+      tags.map(t => this.apply_tag(t));
+    });
+  }
+  remove_tag(tag) {
+    tag = Tag.parse_tag(tag);
+    this._remove_tag(tag);
+    this._remove_pending(tag);
+  }
+  remove_tags(tags) {
+    solidJs.batch(() => {
+      tags.map(t => this.remove_tag(t));
+    });
+  }
+  _has_tag(tag) {
+    return Object.prototype.hasOwnProperty.call(this._state[0], tag.unique_name());
+  }
+  _has_pending(tag) {
+    return Object.prototype.hasOwnProperty.call(this._pending[0], tag.unique_name());
+  }
+  _store_tag(tag) {
+    this._state[1](tag.unique_name(), tag);
+  }
+  _store_pending(tag) {
+    this._pending[1](tag.unique_name(), tag);
+  }
+  _remove_tag(tag) {
+    this._state[1](tag.unique_name(), undefined);
+  }
+  _remove_pending(tag) {
+    this._pending[1](tag.unique_name(), undefined);
+  }
+  get length() {
+    return Object.keys(this._state[0]).length + Object.keys(this._pending[0]).length;
+  }
+  get tags() {
+    return [...Object.values(this._state[0]), ...Object.values(this._pending[0])];
+  }
+  get tag_string() {
+    return this.tags.map(t => t.tag_string()).join(" ");
+  }
+  get tag_names() {
+    return this.tags.map(t => t.tag_string());
+  }
+  filter(cond) {
+    return this.tags.filter(cond);
+  }
+  has(cond) {
+    for (const tag of this.tags) {
+      if (cond(tag)) {
+        return true;
       }
     }
-    if (tags.size > 0) {
-      logger$5.info("Didn't find", [...tags.values()].map(t => t.tag_string()).join(", "));
-    }
-    for (const [_, tag] of tags) {
-      const nf = tag.as_not_found();
-      this._store_tag(nf);
-      result.push(nf);
-    }
-    cb(result);
+    return false;
   }
-  static async _search_tags(tags) {
+  contains(tag) {
+    tag = Tag.parse_tag(tag);
+    return this._has_tag(tag) || this._has_pending(tag);
+  }
+  get(tag) {
+    return this._state[0][tag] || this._pending[0][tag];
+  }
+  count_for_category(category) {
+    let count = 0;
+    for (const tag of this.tags) {
+      if (tag instanceof NormalTag && tag.category === category) {
+        count += 1;
+      }
+    }
+    return count;
+  }
+  clear() {
+    for (const tag of this.tags) {
+      this._remove_tag(tag);
+    }
+  }
+
+  /*
+  
+  public add_tag(tag: Tag) {
+      this.add_tags([ tag ]);
+  }
+   public add_tags(tags: Tag[]) {
+      TagRegistry.store_tags(tags);
+       tags.map(t => this._store_tag(t));
+  }
+    public remove_tags(tags: Tag[]) {
+      tags.forEach(tag => this._remove_tag(tag));
+  }
+   public has_tag(tag: string | Tag): boolean {
+      return this._has_tag(Tag.parse_tag(tag));
+  }
+   
+   
+   
+   
+   public has_pending(): boolean {
+      for (const tag of Object.values(this._state[0])) {
+          if (tag instanceof NotFoundTag || tag instanceof PendingTag) {
+              return true;
+          }
+      }
+       return false;
+  }
+   public has_deprecated(): boolean {
+      for (const tag of Object.values(this._state[0])) {
+          if (tag instanceof FullDataTag && tag.deprecated) {
+              return true;
+          }
+      }
+       return false;
+  }*/
+
+  async _resolve_pending(tags) {
     const PAGE_SIZE = 1000;
     if (tags.length > 1000) {
       throw new Error(`Exceeding page size: ${tags.length} > ${PAGE_SIZE}`);
     }
+    if (tags.length === 0) {
+      return [];
+    }
+    logger$5.debug("Requesting", tags.map(t => t.display_name()));
     const request_data = {
       limit: PAGE_SIZE,
       search: {
-        name: tags,
+        name: tags.map(t => t.unique_name()),
         hide_empty: true
       },
       only: "id,name,is_deprecated,category",
@@ -441,122 +537,9 @@ class TagRegistry {
       dataType: "json",
       data: request_data
     });
-    return res.map(data => new FullDataTag(data.name, CATEGORY_TO_NAME[data.category.toString()], data.is_deprecated));
-  }
-}
-_TagRegistry = TagRegistry;
-TagRegistry._known_tags = {};
-(() => {
-  switch (PageManager.current_page()) {
-    case Page.ViewPost:
-      {
-        const tags = [...$("#tag-list li[data-tag-name][data-is-deprecated]")];
-        logger$5.info("Gathering", tags.map(li => li.dataset.tagName).join(", "));
-        for (const li of tags) {
-          for (const cls of li.classList) {
-            if (cls.startsWith("tag-type-")) {
-              _TagRegistry._store_tag(new FullDataTag(li.dataset.tagName, CATEGORY_TO_NAME[cls.slice(cls.length - 1)], li.dataset.isDeprecated === "true"));
-              break;
-            }
-          }
-        }
-      }
-  }
-})();const RESOLVE_DELAY = 500;
-class TagList {
-  constructor() {
-    this._state = store.createStore({});
-    setInterval(() => TagRegistry.resolve_pending(tags => {
-      solidJs.batch(() => {
-        tags.forEach(tag => this._store_tag(tag));
-      });
-    }), RESOLVE_DELAY);
-  }
-  _has_tag(tag) {
-    return Object.prototype.hasOwnProperty.call(this._state[0], tag);
-  }
-  _store_tag(tag) {
-    this._state[1](tag.unique_name(), tag);
-  }
-  _remove_tag(tag) {
-    this._state[1](tag.unique_name(), undefined);
-  }
-  get length() {
-    return Object.keys(this._state[0]).length;
-  }
-  contains(tag) {
-    return Object.prototype.hasOwnProperty.call(this._state[0], tag);
-  }
-  get(tag) {
-    return this._state[0][tag];
-  }
-  filter(cond) {
-    return Object.values(this._state[0]).filter(cond);
-  }
-  has(cond) {
-    for (const tag of Object.values(this._state[0])) {
-      if (cond(tag)) {
-        return true;
-      }
-    }
-    return false;
-  }
-  clear() {
-    for (const tag of Object.values(this._state[0])) {
-      this._remove_tag(tag);
-    }
-  }
-  add_tag(tag) {
-    this.add_tags([tag]);
-  }
-  add_tags(tags) {
-    TagRegistry.store_tags(tags);
-    tags.map(t => this._store_tag(t));
-  }
-  remove_tag(tag) {
-    this._remove_tag(tag);
-  }
-  remove_tags(tags) {
-    tags.forEach(tag => this._remove_tag(tag));
-  }
-  has_tag(tag) {
-    return this._has_tag(tag);
-  }
-  count_for_category(category) {
-    let count = 0;
-    for (const tag of Object.values(this._state[0])) {
-      if (tag instanceof NewTag || tag instanceof FullDataTag) {
-        if (tag.category === category) {
-          count += 1;
-        }
-      }
-    }
-    return count;
-  }
-  get tags() {
-    return Object.values(this._state[0]);
-  }
-  get tag_names() {
-    return Object.values(this._state[0]).map(t => t.tag_string());
-  }
-  get tag_string() {
-    return this.tag_names.join(" ");
-  }
-  has_pending() {
-    for (const tag of Object.values(this._state[0])) {
-      if (tag instanceof NotFoundTag || tag instanceof PendingTag) {
-        return true;
-      }
-    }
-    return false;
-  }
-  has_deprecated() {
-    for (const tag of Object.values(this._state[0])) {
-      if (tag instanceof FullDataTag && tag.deprecated) {
-        return true;
-      }
-    }
-    return false;
+    const add_map = {};
+    tags.forEach(tag => add_map[tag.unique_name()] = tag.is_add);
+    return res.map(data => new NormalTag(data.name, CATEGORY_TO_NAME[data.category.toString()], data.is_deprecated, false, add_map[data.name]));
   }
 }const DEFAULT_REPLACEMENTS = [{
   type: "regex",
@@ -805,7 +788,7 @@ function node_is_html(node) {
 const GIRL_CHARCOUNTERS = new Set(["1girl", "2girls", "3girls", "4girls", "5girls", "6+girls"]);
 const BOY_CHARCOUNTERS = new Set(["1boy", "2boys", "3boys", "4boys", "5boys", "6+boys"]);
 const OTHER_CHARCOUNTERS = new Set(["1other", "2others", "3others", "4others", "5others", "6+others"]);
-const MUTUALLY_EXCLUSIVE = [GIRL_CHARCOUNTERS, BOY_CHARCOUNTERS, OTHER_CHARCOUNTERS].map(e => new Set(e));
+const MUTUALLY_EXCLUSIVE = [GIRL_CHARCOUNTERS, BOY_CHARCOUNTERS, OTHER_CHARCOUNTERS, ["commentary_request", "commentary"]].map(e => new Set(e));
 class BetterTagBoxFeature extends Feature {
   constructor() {
     super("BetterTagBox");
@@ -842,13 +825,15 @@ class BetterTagBoxFeature extends Feature {
     const deprecated_tags = [];
     const pending_tags = [];
     const unknown_tags = [];
-    for (const tag of this.tag_list.tags) {
-      if (tag instanceof FullDataTag && tag.deprecated) {
-        deprecated_tags.push(tag.display_name());
-      } else if (tag instanceof PendingTag) {
-        pending_tags.push(tag.display_name());
-      } else if (tag instanceof NotFoundTag) {
-        unknown_tags.push(tag.display_name());
+    for (const tag of this.tag_list.tags.filter(t => t instanceof NormalTag)) {
+      if (tag.is_deprecated) {
+        deprecated_tags.push(tag);
+      } else if (tag.category === "unknown") {
+        if (tag.is_new) {
+          unknown_tags.push(tag);
+        } else {
+          pending_tags.push(tag);
+        }
       }
     }
     ret && (ret = deprecated_tags.length === 0 && pending_tags.length === 0 && unknown_tags.length === 0);
@@ -860,7 +845,7 @@ class BetterTagBoxFeature extends Feature {
 
     /// No artist tag if required
     if (this.tag_list.count_for_category("artist") === 0) {
-      if (!this.tag_list.has_tag("artist_request") && !this.tag_list.has_tag("official_art")) {
+      if (!this.tag_list.contains("artist_request") && !this.tag_list.contains("official_art")) {
         notice.push("No artist");
         ret = false;
       }
@@ -868,7 +853,7 @@ class BetterTagBoxFeature extends Feature {
     ///
 
     /// No copyright tags
-    if (this.tag_list.count_for_category("copyright") === 0 && !this.tag_list.has_tag("copyright_request")) {
+    if (this.tag_list.count_for_category("copyright") === 0 && !this.tag_list.contains("copyright_request")) {
       notice.push("No copyright");
       ret = false;
     }
@@ -888,6 +873,7 @@ class BetterTagBoxFeature extends Feature {
         matches.forEach(match => error_tags.add(match));
       }
     }
+
     ///
 
     /// No charcounters
@@ -917,13 +903,23 @@ class BetterTagBoxFeature extends Feature {
     $(".related-tags li").each((_, el) => {
       const li = $(el);
       const tag_name = li.find("a[data-tag-name]").data("tag-name");
-      if (this.tag_list.has(t => t.search_string() === tag_name)) {
+      if (this.tag_list.has(t => t.unique_name() === tag_name)) {
         logger$4.debug("Selecting", li.find("a[data-tag-name]"));
         li.addClass("selected").find("input").prop("checked", true);
       } else {
         li.removeClass("selected").find("input").prop("checked", false);
       }
     });
+  }
+  _toggle_tag(e) {
+    e.preventDefault();
+    const tag = $(e.target).data("tag-name");
+    if (this.tag_list.contains(tag)) {
+      this.tag_list.remove_tag(tag);
+    } else {
+      this.tag_list.apply_tag(tag);
+    }
+    this._update_selected_tags();
   }
   _tag_list_updated() {
     $("#post_tag_string").val(this.tag_list.tag_string).trigger("input.$");
@@ -939,7 +935,11 @@ class BetterTagBoxFeature extends Feature {
     }
     if (this.tag_list.contains("parent")) {
       const tag = this.tag_list.get("parent");
-      $("#post_parent_id").val(tag.value);
+      if (tag.is_add) {
+        $("#post_parent_id").val(tag.value);
+      } else {
+        $("#post_parent_id").val("");
+      }
     } else {
       if ($("#post_parent_id").val()) {
         $("#post_parent_id").val("");
@@ -988,12 +988,8 @@ class BetterTagBoxFeature extends Feature {
       return;
     }
     const last = this._history.pop();
-    let tag = last.tag.display_name();
-    if (last.action === "remove") {
-      tag = "-" + tag;
-    }
-    this.tag_list.remove_tag(last.tag);
-    $("#awoo-tag-box").val(tag);
+    this.tag_list.remove_tag(last);
+    $("#awoo-tag-box").val(last.display_name());
     if (select) {
       $("#awoo-tag-box").select();
     }
@@ -1002,11 +998,16 @@ class BetterTagBoxFeature extends Feature {
     if (!tag) {
       return;
     }
-    const is_negated = tag[0] === "-";
-    if (!is_negated) {
+    const is_add = tag[0] !== "-";
+
+    /* Don't autocorrect tag removals, this gets in the way of removing typos  */
+    if (is_add) {
       [tag] = Autocorrect.correct_tag(tag);
     }
-    const parsed = TagRegistry.parse_tag(is_negated ? tag.slice(1) : tag);
+
+    // const parsed = TagRegistry.parse_tag(is_negated ? tag.slice(1) : tag);
+    const parsed = Tag.parse_tag(tag);
+    logger$4.info("Adding", tag, parsed);
     if (!parsed) {
       /* Can't parse it, what to do? */
       $("#awoo-tag-box").parent().addClass("field_with_errors");
@@ -1014,42 +1015,15 @@ class BetterTagBoxFeature extends Feature {
       return;
     }
     $("#awoo-tag-box").parent().removeClass("field_with_errors");
-    if (is_negated) {
-      if (parsed.render_settings().can_remove) {
-        logger$4.info("Removing:", parsed.tag_string());
-        this.tag_list.remove_tag(parsed);
-        this._history.push({
-          tag: parsed,
-          action: "remove"
-        });
-      }
-    } else {
-      logger$4.info("Adding:", parsed.tag_string());
-      this.tag_list.add_tag(parsed);
-      this._history.push({
-        tag: parsed,
-        action: "add"
-      });
-    }
+    this.tag_list.apply_tag(parsed);
+
+    /* Only store tag addition in history */
+    this._history.push(parsed);
     this._tag_box_value = "";
   }
   _set_tag_string(tags) {
-    // this.tag_list.clear();
-
-    const mapping = new Map();
-    for (let tag of sanitize_tag_string(tags)) {
-      const is_negated = tag[0] === "-";
-      if (!is_negated) {
-        [tag] = Autocorrect.correct_tag(tag);
-      }
-      const parsed = TagRegistry.parse_tag(is_negated ? tag.slice(1) : tag) || new NotFoundTag(tag);
-      if (is_negated) {
-        mapping.delete(parsed.unique_name());
-      } else {
-        mapping.set(parsed.unique_name(), parsed);
-      }
-    }
-    this.tag_list.add_tags([...mapping.values()]);
+    this.tag_list.clear();
+    this.tag_list.apply_tags(sanitize_tag_string(tags).map(Tag.parse_tag));
   }
   _edit_tag(tag) {
     this.tag_list.remove_tag(tag);
@@ -1103,15 +1077,17 @@ class BetterTagBoxFeature extends Feature {
     const commentary_tags = ["commentary", "hashtag-only_commentary"];
     logger$4.info("Hashtag-only:", hashtag_only);
     if (hashtag_only) {
-      this.tag_list.add_tags(commentary_tags.map(t => TagRegistry.parse_tag(t)));
+      this.tag_list.apply_tags(commentary_tags);
     } else {
-      this.tag_list.remove_tags(commentary_tags.map(t => TagRegistry.parse_tag(t)));
+      this.tag_list.remove_tags(commentary_tags);
     }
     this._tag_list_updated();
   }
   make_tag_box() {
-    const callback_builder = category => t => (t instanceof FullDataTag && !t.deprecated || t instanceof NewTag) && t.category === category;
-    const callbacks = [...NormalTagCategories.map(callback_builder), t => t instanceof MetaTag, t => t instanceof PendingTag, t => t instanceof FullDataTag && t.deprecated, t => t instanceof NotFoundTag];
+    const callback_builder = category => t => t instanceof NormalTag && !t.is_deprecated && t.category === category;
+
+    // TODO: Put negated tags at the bottom
+    const callbacks = [...NormalTagCategories.map(callback_builder), t => t instanceof MetaTag, t => t instanceof NormalTag && t.is_deprecated, t => t instanceof NormalTag && t.category === "unknown"];
     const _self$ = this;
     return [(() => {
       var _el$3 = _tmpl$3$2();
@@ -1125,11 +1101,13 @@ class BetterTagBoxFeature extends Feature {
         _el$6 = _el$5.nextSibling,
         _el$7 = _el$6.nextSibling;
       _el$5.$$click = async e => {
+        e.preventDefault();
         await navigator.clipboard.writeText(_self$.tag_list.tag_string);
         Danbooru.Utility.notice("Tags copied", false);
         $(e.target).blur();
       };
       _el$7.$$click = async e => {
+        e.preventDefault();
         _self$._set_tag_string(await navigator.clipboard.readText());
         Danbooru.Utility.notice("Tags pasted", false);
         $(e.target).blur();
@@ -1166,29 +1144,19 @@ class BetterTagBoxFeature extends Feature {
             return _self$.tag_list.filter(cb).sort();
           },
           children: tag => {
-            const settings = tag.render_settings();
-            return web.createComponent(web.Dynamic, web.mergeProps({
+            //const settings = tag.render_settings();
+            return web.createComponent(web.Dynamic, {
               component: "li",
               get ["class"]() {
-                return `awoo-tag ${settings.class_string} ${_self$._error_tags().has(tag.tag_string()) ? "awoo-tag-error" : ""}`;
+                return `awoo-tag ${tag.class_string()} ${_self$._error_tags().has(tag.tag_string()) ? "awoo-tag-error" : ""}`;
               },
               get ["data-tag-string"]() {
                 return tag.tag_string();
               },
-              get ["data-unique-name"]() {
-                return tag.unique_name();
-              },
-              get ["data-display-name"]() {
-                return tag.display_name();
-              },
-              get ["data-base-name"]() {
-                return tag.search_string();
-              }
-            }, () => settings.properties, {
               get children() {
                 return [web.createComponent(solidJs.Show, {
                   get when() {
-                    return settings.can_remove;
+                    return !(tag instanceof MetaTag && tag.key === "rating");
                   },
                   fallback: "\xA0\xA0\xA0\xA0\xA0\xA0\xA0",
                   get children() {
@@ -1213,7 +1181,9 @@ class BetterTagBoxFeature extends Feature {
                     })(), "\xA0"];
                   }
                 }), web.createComponent(solidJs.Show, {
-                  when: tag instanceof NewTag || tag instanceof FullDataTag,
+                  get when() {
+                    return tag instanceof NormalTag && tag.is_add && tag.category !== "unknown";
+                  },
                   get fallback() {
                     return (() => {
                       var _el$18 = _tmpl$10();
@@ -1239,7 +1209,7 @@ class BetterTagBoxFeature extends Feature {
                   }
                 })];
               }
-            }));
+            });
           }
         })
       }));
@@ -1303,7 +1273,10 @@ class BetterTagBoxFeature extends Feature {
         return list.append(item);
       }
     });
+    $(document).off("change.danbooru", ".related-tags input");
+    $(document).off("click.danbooru", ".related-tags .tag-list a");
     Danbooru.RelatedTag.update_selected = _ => this._update_selected_tags();
+    Danbooru.RelatedTag.toggle_tag = e => this._toggle_tag(e);
     const initial_tags = sanitize_tag_string($("#post_tag_string").val() || "");
     const initial_parent = $("#post_parent_id").val();
     if (initial_parent) {
@@ -1420,6 +1393,7 @@ class OneUpFeature extends Feature {
     Options.register_feature("oneup", this);
   }
   copy_tags(data, e) {
+    e.preventDefault();
     if (data.mode === "another_child") {
       $("#post_tag_string").val($("#post_tag_string").val() + ` child:${data.post.dataset.id}`);
       $("#post_tag_string").trigger("input");

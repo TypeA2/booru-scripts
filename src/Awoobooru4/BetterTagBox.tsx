@@ -4,8 +4,7 @@ import Options from "./Options";
 import { Dynamic, render } from "solid-js/web";
 import Logger from "./Logger";
 import { TagList } from "./TagList";
-import { FullDataTag, MetaTag, NewTag, NormalTagCategories, NotFoundTag, PendingTag, sanitize_tag_string, Tag } from "./Tag";
-import TagRegistry from "./TagRegistry";
+import { MetaTag, NormalTag, NormalTagCategories, sanitize_tag_string, Tag } from "./Tag";
 import Autocorrect from "./Autocorrect";
 import { Page, PageManager } from "./PageManager";
 
@@ -54,6 +53,7 @@ const MUTUALLY_EXCLUSIVE = [
     GIRL_CHARCOUNTERS,
     BOY_CHARCOUNTERS,
     OTHER_CHARCOUNTERS,
+    [ "commentary_request", "commentary" ]
 ].map(e => new Set(e));
 
 export default class BetterTagBoxFeature extends Feature {
@@ -103,16 +103,18 @@ export default class BetterTagBoxFeature extends Feature {
         ///
 
         /// Has deprecated, pending, unknown tags
-        const deprecated_tags: string[] = [];
-        const pending_tags: string[] = [];
-        const unknown_tags: string[] = [];
-        for (const tag of this.tag_list.tags) {
-            if (tag instanceof FullDataTag && tag.deprecated) {
-                deprecated_tags.push(tag.display_name());
-            } else if (tag instanceof PendingTag) {
-                pending_tags.push(tag.display_name());
-            } else if (tag instanceof NotFoundTag) {
-                unknown_tags.push(tag.display_name());
+        const deprecated_tags: NormalTag[] = [];
+        const pending_tags: NormalTag[] = [];
+        const unknown_tags: NormalTag[] = [];
+        for (const tag of this.tag_list.tags.filter(t => t instanceof NormalTag)) {
+            if (tag.is_deprecated) {
+                deprecated_tags.push(tag);
+            } else if (tag.category === "unknown") {
+                if (tag.is_new) {
+                    unknown_tags.push(tag);
+                } else {
+                    pending_tags.push(tag);
+                }
             }
         }
 
@@ -126,8 +128,8 @@ export default class BetterTagBoxFeature extends Feature {
         
         /// No artist tag if required
         if (this.tag_list.count_for_category("artist") === 0) {
-            if (!this.tag_list.has_tag("artist_request")
-                && !this.tag_list.has_tag("official_art")) {
+            if (!this.tag_list.contains("artist_request")
+                && !this.tag_list.contains("official_art")) {
 
                 notice.push("No artist");
                 ret = false;
@@ -136,7 +138,7 @@ export default class BetterTagBoxFeature extends Feature {
         ///
 
         /// No copyright tags
-        if (this.tag_list.count_for_category("copyright") === 0 && !this.tag_list.has_tag("copyright_request")) {
+        if (this.tag_list.count_for_category("copyright") === 0 && !this.tag_list.contains("copyright_request")) {
             notice.push("No copyright");
             ret = false;
         }
@@ -160,6 +162,7 @@ export default class BetterTagBoxFeature extends Feature {
                 matches.forEach(match => error_tags.add(match));
             }
         }
+    
         ///
 
         /// No charcounters
@@ -200,7 +203,7 @@ export default class BetterTagBoxFeature extends Feature {
 
             const tag_name = li.find("a[data-tag-name]").data("tag-name");
 
-            if (this.tag_list.has(t => t.search_string() === tag_name)) {
+            if (this.tag_list.has(t => t.unique_name() === tag_name)) {
                 logger.debug("Selecting", li.find("a[data-tag-name]"));
 
                 li.addClass("selected").find("input").prop("checked", true);
@@ -208,6 +211,20 @@ export default class BetterTagBoxFeature extends Feature {
                 li.removeClass("selected").find("input").prop("checked", false);
             }
         });
+    }
+
+    private _toggle_tag(e: InputEvent): void {
+        e.preventDefault();
+
+        const tag: string = $(e.target).data("tag-name");
+
+        if (this.tag_list.contains(tag)) {
+            this.tag_list.remove_tag(tag);
+        } else {
+            this.tag_list.apply_tag(tag);
+        }
+
+        this._update_selected_tags();
     }
 
     private _tag_list_updated() {
@@ -227,7 +244,12 @@ export default class BetterTagBoxFeature extends Feature {
 
         if (this.tag_list.contains("parent")) {
             const tag = this.tag_list.get("parent") as MetaTag;
-            $("#post_parent_id").val(tag.value);
+
+            if (tag.is_add) {
+                $("#post_parent_id").val(tag.value);
+            } else {
+                $("#post_parent_id").val("");
+            }
         } else {
             if ($("#post_parent_id").val()) {
                 $("#post_parent_id").val("");
@@ -280,10 +302,7 @@ export default class BetterTagBoxFeature extends Feature {
         }
     }
 
-    private _history: {
-        tag: Tag;
-        action: "add" | "remove";
-    }[] = [];
+    private _history: Tag[] = [];
 
     private _try_undo(select: boolean) {
         if (this._history.length === 0) {
@@ -292,13 +311,8 @@ export default class BetterTagBoxFeature extends Feature {
 
         const last = this._history.pop();
 
-        let tag = last.tag.display_name();
-        if (last.action === "remove") {
-            tag = "-" + tag;
-        }
-
-        this.tag_list.remove_tag(last.tag);
-        $("#awoo-tag-box").val(tag);
+        this.tag_list.remove_tag(last);
+        $("#awoo-tag-box").val(last.display_name());
 
         if (select) {
             $("#awoo-tag-box").select();
@@ -310,13 +324,17 @@ export default class BetterTagBoxFeature extends Feature {
             return;
         }
 
-        const is_negated = tag[0] === "-";
+        const is_add = tag[0] !== "-";
 
-        if (!is_negated) {
+        /* Don't autocorrect tag removals, this gets in the way of removing typos  */
+        if (is_add) {
             [tag, ] = Autocorrect.correct_tag(tag);
         }
 
-        const parsed = TagRegistry.parse_tag(is_negated ? tag.slice(1) : tag);
+        // const parsed = TagRegistry.parse_tag(is_negated ? tag.slice(1) : tag);
+        const parsed = Tag.parse_tag(tag);
+
+        logger.info("Adding", tag, parsed);
 
         if (!parsed) {
             /* Can't parse it, what to do? */
@@ -327,46 +345,18 @@ export default class BetterTagBoxFeature extends Feature {
         
         $("#awoo-tag-box").parent().removeClass("field_with_errors");
 
-        if (is_negated) {
-            if (parsed.render_settings().can_remove) {
-                logger.info("Removing:", parsed.tag_string());
-                this.tag_list.remove_tag(parsed);
+        this.tag_list.apply_tag(parsed);
 
-                this._history.push({ tag: parsed, action: "remove" });
-            }
-        } else {
-            logger.info("Adding:", parsed.tag_string());
-            this.tag_list.add_tag(parsed);
-
-            this._history.push({ tag: parsed, action: "add" });
-
-        }
+        /* Only store tag addition in history */
+        this._history.push(parsed);
 
         this._tag_box_value = "";
     }
 
     private _set_tag_string(tags: string) {
-        // this.tag_list.clear();
+        this.tag_list.clear();
 
-        const mapping = new Map<string, Tag>();
-
-        for (let tag of sanitize_tag_string(tags)) {
-            const is_negated = tag[0] === "-";
-
-            if (!is_negated) {
-                [tag, ] = Autocorrect.correct_tag(tag);
-            }
-            
-            const parsed = TagRegistry.parse_tag(is_negated ? tag.slice(1) : tag) || new NotFoundTag(tag);
-
-            if (is_negated) {
-                mapping.delete(parsed.unique_name());
-            } else {
-                mapping.set(parsed.unique_name(), parsed);
-            }
-        }
-
-        this.tag_list.add_tags([...mapping.values()]);
+        this.tag_list.apply_tags(sanitize_tag_string(tags).map(Tag.parse_tag));
     }
 
     private _edit_tag(tag: Tag) {
@@ -432,14 +422,14 @@ export default class BetterTagBoxFeature extends Feature {
         const commentary_tags = [
             "commentary",
             "hashtag-only_commentary"
-        ] as const;
+        ];
 
         logger.info("Hashtag-only:", hashtag_only);
 
         if (hashtag_only) {
-            this.tag_list.add_tags(commentary_tags.map(t => TagRegistry.parse_tag(t)));
+            this.tag_list.apply_tags(commentary_tags);
         } else {
-            this.tag_list.remove_tags(commentary_tags.map(t => TagRegistry.parse_tag(t)));
+            this.tag_list.remove_tags(commentary_tags);
         }
 
         this._tag_list_updated();
@@ -447,26 +437,28 @@ export default class BetterTagBoxFeature extends Feature {
 
     private make_tag_box() {
         const callback_builder = (category: string): (t: Tag) => boolean =>
-            t => ((t instanceof FullDataTag && !t.deprecated) || t instanceof NewTag) && t.category === category;
+            t => t instanceof NormalTag && !t.is_deprecated && t.category === category;
 
+        // TODO: Put negated tags at the bottom
         const callbacks: ((t: Tag) => boolean)[] = [
             ...NormalTagCategories.map(callback_builder),
             t => t instanceof MetaTag,
-            t => t instanceof PendingTag,
-            t => t instanceof FullDataTag && t.deprecated,
-            t => t instanceof NotFoundTag
+            t => t instanceof NormalTag && t.is_deprecated,
+            t => t instanceof NormalTag && t.category === "unknown",
         ];
 
         return <>
             <input type="text" id="awoo-tag-box" onKeyDown={e => { this._tag_box_keydown(e);} } />
             <span id="awoo-copy-controls">
                 <a href="#" onClick={async e => {
+                    e.preventDefault();
                     await navigator.clipboard.writeText(this.tag_list.tag_string);
                     Danbooru.Utility.notice("Tags copied", false);
                     $(e.target).blur();
                 }}>Copy tags</a>
                 &nbsp;-&nbsp;
                 <a href="#" onClick={async e => {
+                    e.preventDefault();
                     this._set_tag_string(await navigator.clipboard.readText());
                     Danbooru.Utility.notice("Tags pasted", false);
                     $(e.target).blur();
@@ -489,17 +481,18 @@ export default class BetterTagBoxFeature extends Feature {
                 {cb =>
                     <For each={this.tag_list.filter(cb).sort()}>
                     {tag => {
-                        const settings = tag.render_settings();
+                        //const settings = tag.render_settings();
                         return <Dynamic
                             component="li"
-                            class={`awoo-tag ${settings.class_string} ${this._error_tags().has(tag.tag_string()) ? "awoo-tag-error" : ""}`}
+                            class={`awoo-tag ${tag.class_string()} ${this._error_tags().has(tag.tag_string()) ? "awoo-tag-error" : ""}`}
                             data-tag-string={tag.tag_string()}
-                            data-unique-name={tag.unique_name()}
-                            data-display-name={tag.display_name()}
-                            data-base-name={tag.search_string()}
-                            {...settings.properties}>
+                            //data-unique-name={tag.unique_name()}
+                            //data-display-name={tag.display_name()}
+                            //data-base-name={tag.search_string()}
+                            //{...settings.properties}>
+                            >
                             {/* 7x nbsp seems to work lol */}
-                            <Show when={settings.can_remove} fallback="&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;">
+                            <Show when={!(tag instanceof MetaTag && tag.key === "rating")} fallback="&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;">
                                 <a href="#" title={`Remove "${tag.display_name()}"`} on:click={e => {
                                     e.preventDefault();
                                     this.tag_list.remove_tag(tag);
@@ -512,11 +505,11 @@ export default class BetterTagBoxFeature extends Feature {
                                 &nbsp;
                             </Show>
 
-                            <Show when={tag instanceof NewTag || tag instanceof FullDataTag}
+                            <Show when={tag instanceof NormalTag && tag.is_add && tag.category !== "unknown"}
                                 fallback={<a href={`/posts?tags=${tag.search_string()}`} target="_blank">{tag.display_name()}</a>}>
                                 <a href={`/posts?tags=${tag.search_string()}`}
                                     target="_blank"
-                                    class={`tag-type-${CATEGORY_TO_ID[(tag as FullDataTag).category]}`}>
+                                    class={`tag-type-${CATEGORY_TO_ID[(tag as NormalTag).category]}`}>
                                     {tag.display_name()}
                                 </a>
                             </Show>
@@ -601,7 +594,12 @@ export default class BetterTagBoxFeature extends Feature {
             }
         });
 
+
+        $(document).off("change.danbooru", ".related-tags input");
+        $(document).off("click.danbooru", ".related-tags .tag-list a");
+
         Danbooru.RelatedTag.update_selected = _ => this._update_selected_tags();
+        Danbooru.RelatedTag.toggle_tag = e => this._toggle_tag(e);
 
         const initial_tags = sanitize_tag_string($("#post_tag_string").val() as string || "");
         const initial_parent = $("#post_parent_id").val();

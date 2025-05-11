@@ -31,3 +31,7 @@
     margin-bottom: 0 !important;
     margin-left: 0.5em;
 }
+
+#awoo-tag-list:has(> ul:empty) {
+    display: none;
+}

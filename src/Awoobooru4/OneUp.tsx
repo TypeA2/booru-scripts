@@ -38,6 +38,8 @@ export default class OneUpFeature extends Feature {
     }
 
     private copy_tags(data: { post: HTMLElement, mode: "parent" | "another_child" | "child" }, e: MouseEvent): void {
+        e.preventDefault();
+        
         if (data.mode === "another_child") {
             $("#post_tag_string").val($("#post_tag_string").val() + ` child:${data.post.dataset.id}`);
             $("#post_tag_string").trigger("input");

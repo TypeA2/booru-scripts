@@ -74,217 +74,232 @@ export interface TagRenderSettings {
     properties: { [key: string]: string };
 }
 
+/*
 export abstract class Tag {
     private _tag_string: string;
+    private _is_added: boolean;
 
-    protected constructor(tag_string: string) {
+    protected constructor(tag_string: string, is_added: boolean) {
         this._tag_string = tag_string;
+        this._is_added = is_added;
     }
 
     public toString(): string {
         return this.tag_string();
     }
 
-    /* Full name to be used in the tag string */
+    /* Full name to be used in the tag string *
     public tag_string(): string { return this._tag_string; }
 
-    /* Used to check for uniqueness, discarding any modifiers */
+    /* Used to check for uniqueness, discarding any modifiers *
     public abstract unique_name(): string;
 
-    /* Friendly display name */
+    /* Friendly display name *
     public abstract display_name(): string;
 
-    /* Prefix-less tagname */
+    /* Prefix-less tagname *
     public abstract search_string(): string;
 
-    /* Properties applied to the tag */
+    /* Properties applied to the tag *
     public abstract render_settings(): TagRenderSettings;
-};
+};*/
 
-export class PendingTag extends Tag {
-    public constructor(tag: string) {
-        super(tag);
+const PARENT_CHILD_TEXT_ARGS = [
+    "active", "any", "appealed",
+    "banned", "deleted", "flagged",
+    "modqueue", "none", "pending",
+    "unmoderated"
+];
+
+export abstract class Tag {
+    /* Is this tag being added or removed */
+    private _is_add: boolean;
+
+    protected constructor(is_add: boolean) {
+        this._is_add = is_add;
     }
 
-    public unique_name(): string {
-        return this.tag_string();
+    public get is_add(): boolean {
+        return this._is_add;
     }
 
-    public display_name(): string {
-        return this.tag_string();
+    public toString(): string {
+        return this.display_name();
     }
 
-    public search_string(): string {
-        return this.tag_string();
-    }
+    public abstract unique_name(): string;
+    public abstract display_name(): string;
+    public abstract tag_string(): string;
+    public abstract search_string(): string;
 
-    public render_settings(): TagRenderSettings {
-        return {
-            class_string: "awoo-tag-pending",
-            can_remove: true,
-            properties: {}
-        };
-    }
+    public abstract class_string(): string;
 
-    public as_not_found(): NotFoundTag {
-        return new NotFoundTag(this.tag_string());
-    }
-}
-
-export class NotFoundTag extends Tag {
-    public constructor(tag: string) {
-        super(tag);
-    }
-
-    public unique_name(): string {
-        return this.tag_string();
-    }
-
-    public display_name(): string {
-        return this.tag_string();
-    }
-
-    public search_string(): string {
-        return this.tag_string();
-    }
-
-    public render_settings(): TagRenderSettings {
-        return {
-            class_string: "awoo-tag-unknown",
-            can_remove: true,
-            properties: {}
-        };
-    }
-}
-
-export class FullDataTag extends Tag {
-    private __category: NormalTagCategory;
-    public get category() { return this.__category; }
-
-    private __deprecated: boolean;
-    public get deprecated() { return this.__deprecated; }
-
-    public constructor(name: string, category: NormalTagCategory, is_deprecated: boolean) {
-        super(name);
-
-        this.__category = category;
-        this.__deprecated = is_deprecated;
-    }
-
-    public unique_name(): string {
-        return this.tag_string();
-    }
-
-    public display_name(): string {
-        return this.tag_string();
-    }
-
-    public search_string(): string {
-        return this.tag_string();
-    }
-
-    public render_settings(): TagRenderSettings {
-        return {
-            class_string: `awoo-tag-${this.category} ${this.deprecated ? "awoo-tag-deprecated" : ""}`,
-            can_remove: true,
-            properties: {
-                "data-tag-category": this.category,
-                "data-tag-is-deprecated": this.deprecated ? "true" : "false"
-            }
-        };
-    }
-}
-
-
-export class NewTag extends Tag {
-    private _category: string;
-    public get category() { return this._category; }
-
-    private _tag: string;
-    public get tag() { return this._tag; }
-
-    public constructor(category: NormalTagCategory, tag: string) {
-        super(category + ":" + tag);
-
-        this._category = PREFIX_TO_CATEGORY[category];
-        this._tag = tag;
-    }
-
-    public unique_name(): string {
-        return this.tag;
-    }
-
-    public display_name(): string {
-        /* Don't show prefix on current artist */
-        if (this.tag === $(".source-data-content a.tag-type-1").text()) {
-            return this.tag;
+    public static parse_tag(tag: string | Tag): Tag {
+        if (tag instanceof Tag) {
+            return tag;
         }
 
-        return this.category + ":" + this.tag; 
+        const is_add = tag[0] !== "-";
+        const raw_tag = is_add ? tag : tag.slice(1);
+
+        /* If it's a valid tag prefix (sometimes normal tags contain a :) */
+        if (raw_tag.indexOf(":") > 1 && TagPrefixes.includes(raw_tag.split(":", 1)[0])) {
+            const [prefix, name] = raw_tag.split(":", 2);
+    
+            if (prefix in PREFIX_TO_CATEGORY) {
+                /* Tag with explicit category */
+                return new NormalTag(name, PREFIX_TO_CATEGORY[prefix], false, true, is_add);
+
+            } else if (MetaTagCategories.includes(prefix as MetaTagCategory)) {
+                /**
+                 * A few considerations:
+                 * * `rating` cannot be negated
+                 * * `parent` is handled locally (TODO: maybe don't do this?)
+                 * * All other negated metatags are passed through as-is
+                 */
+                switch (prefix) {
+                    case "rating":
+                        if (!is_add || !"gsqe".includes(name[0])) {
+                            return null;
+                        }
+                        break;
+    
+                    case "parent":
+                    case "child":
+                        if (!/^\d+$/.test(name) && !PARENT_CHILD_TEXT_ARGS.includes(name)) {
+                            return null;
+                        }
+                        break;
+                }
+    
+                return new MetaTag(
+                    prefix as MetaTagCategory,
+                    prefix === "rating" ? name[0] :
+                    name,
+                    is_add
+                );
+            }
+                
+            return null;
+        }
+
+        /* If the tag is already present somewhere on the page we can now it's type */
+        const el = $(`[data-tag-name="${raw_tag}"]`);
+        if (el.length > 0) {
+            for (const cls of el[0].classList) {
+                if (cls.startsWith("tag-type-")) {
+                    return new NormalTag(raw_tag, CATEGORY_TO_NAME[cls[9]], false, false, is_add);
+                }
+            }
+        }
+    
+        return new NormalTag(raw_tag, "unknown", false, false, is_add);
+    }
+};
+
+/* Any normal tag, new or not */
+export class NormalTag extends Tag {
+    private _tag_name: string;
+    private _tag_category: NormalTagCategory | "unknown";
+    private _is_deprecated: boolean;
+
+    public constructor(
+        tag_name: string,
+        tag_category: NormalTagCategory | "unknown",
+        is_deprecated: boolean,
+        is_new: boolean,
+        is_add: boolean) {
+
+        super(is_add);
+
+        this._tag_name = tag_name;
+        this._tag_category = tag_category;
+        this._is_deprecated = is_deprecated;
+        this.is_new = is_new;
+    }
+
+    public get category() {
+        return this._tag_category;
+    }
+
+    public get is_deprecated(): boolean {
+        return this._is_deprecated;
+    }
+
+    public is_new: boolean;
+
+
+    public unique_name(): string {
+        return this._tag_name;
+    }
+
+    public display_name(): string {
+        return this._tag_name;
+    }
+
+    public tag_string(): string {
+        return `${this.is_add ? "" : "-"}${this.is_new ? this._tag_category + ":" : ""}${this._tag_name}`;
     }
 
     public search_string(): string {
-        return this.tag;
+        return this._tag_name;
     }
 
-    public render_settings(): TagRenderSettings {
-        return {
-            class_string: `awoo-tag-${this.category}`,
-            can_remove: true,
-            properties: {
-                "data-category": this.category
-            }
-        };
+    public class_string(): string {
+        if (this.is_new && this._tag_category === "unknown") {
+            return "awoo-tag-error";
+        }
+
+        return "";
     }
 }
 
+/* Any meta tag, these do special things */
 export class MetaTag extends Tag {
-    private _kind: MetaTagCategory;
-    public get kind() { return this._kind; }
-
+    /* Metatags are a key/value pair */
+    private _key: MetaTagCategory;
     private _value: string;
-    public get value() { return this._value; }
 
-    public constructor(kind: MetaTagCategory, value: string) {
-        super(kind + ":" + value);
+    public constructor(key: MetaTagCategory, value: string, is_add: boolean) {
+        super(is_add);
 
-        this._kind = kind;
+        this._key = key;
         this._value = value;
     }
 
+    public get key(): string { return this._key; }
+    public get value(): string { return this._value; }
+
     public unique_name(): string {
-        switch (this.kind) {
-            /* These can appear multiple times */
-            case "child":
-            case "pool":
-            case "newpool":
-            case "favgroup":
-                return this.kind + ":" + this.value;
+        switch (this._key) {
+            /* These may have only 1 instance */
+            case "parent":
+            case "locked":
+            case "rating":
+                return this._key;
         }
 
-        return this.kind;
+        /* Intentionally ignore `is_add` */
+        return `${this._key}:${this._value}`;
     }
 
     public display_name(): string {
-        switch (this.kind) {
-            case "rating": return `${this.kind}:${this.value[0]}`;
-        }
+        return `${this.is_add ? "" : "-"}${this._key}:${this._value}`;
+    }
 
-        return this.kind + ":" + this.value;
+    public tag_string(): string {
+        if (this.is_add) {
+            return `${this._key}:${this._value}`;
+        } else {
+            return `-${this._key}:${this._value}`;
+        }
     }
 
     public search_string(): string {
-        return this.tag_string();
+        return `${this._key}:${this._value}`;
     }
 
-    public render_settings(): TagRenderSettings {
-        return {
-            class_string: "awoo-tag-meta-tag",
-            can_remove: this.kind !== "rating",
-            properties: {
-                "data-meta-category": this.kind,
-                "data-meta-value": this.value
-            }
-        };
+    public class_string(): string {
+        return "awoo-tag-meta-tag";
     }
 }
