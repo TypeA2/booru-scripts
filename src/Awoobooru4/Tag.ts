@@ -74,36 +74,6 @@ export interface TagRenderSettings {
     properties: { [key: string]: string };
 }
 
-/*
-export abstract class Tag {
-    private _tag_string: string;
-    private _is_added: boolean;
-
-    protected constructor(tag_string: string, is_added: boolean) {
-        this._tag_string = tag_string;
-        this._is_added = is_added;
-    }
-
-    public toString(): string {
-        return this.tag_string();
-    }
-
-    /* Full name to be used in the tag string *
-    public tag_string(): string { return this._tag_string; }
-
-    /* Used to check for uniqueness, discarding any modifiers *
-    public abstract unique_name(): string;
-
-    /* Friendly display name *
-    public abstract display_name(): string;
-
-    /* Prefix-less tagname *
-    public abstract search_string(): string;
-
-    /* Properties applied to the tag *
-    public abstract render_settings(): TagRenderSettings;
-};*/
-
 const PARENT_CHILD_TEXT_ARGS = [
     "active", "any", "appealed",
     "banned", "deleted", "flagged",

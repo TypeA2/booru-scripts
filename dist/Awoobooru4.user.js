@@ -3,7 +3,7 @@
 // @namespace   https://github.com/TypeA2/booru-scripts
 // @match       *://*.donmai.us/*
 // @match       *://cos.lycore.co/*
-// @version     4.0.2b
+// @version     4.0.4b
 // @author      TypeA2
 // @description Various utilities to make life easier
 // @require     https://cdn.jsdelivr.net/npm/@violentmonkey/dom@2
@@ -161,36 +161,6 @@ const CATEGORY_TO_NAME = {
 function sanitize_tag_string(tags) {
   return tags.split(/([\s\n])/).map(tag => tag.toLowerCase()).filter(s => /\S/.test(s)).sort();
 }
-/*
-export abstract class Tag {
-    private _tag_string: string;
-    private _is_added: boolean;
-
-    protected constructor(tag_string: string, is_added: boolean) {
-        this._tag_string = tag_string;
-        this._is_added = is_added;
-    }
-
-    public toString(): string {
-        return this.tag_string();
-    }
-
-    /* Full name to be used in the tag string *
-    public tag_string(): string { return this._tag_string; }
-
-    /* Used to check for uniqueness, discarding any modifiers *
-    public abstract unique_name(): string;
-
-    /* Friendly display name *
-    public abstract display_name(): string;
-
-    /* Prefix-less tagname *
-    public abstract search_string(): string;
-
-    /* Properties applied to the tag *
-    public abstract render_settings(): TagRenderSettings;
-};*/
-
 const PARENT_CHILD_TEXT_ARGS = ["active", "any", "appealed", "banned", "deleted", "flagged", "modqueue", "none", "pending", "unmoderated"];
 class Tag {
   /* Is this tag being added or removed */
@@ -343,13 +313,6 @@ class TagList {
   constructor() {
     this._state = store.createStore({});
     this._pending = store.createStore({});
-
-    // TODO this breaks if more than 1 tag list exists (does it?)
-    /*setInterval(() => TagRegistry.resolve_pending(tags => {
-        batch(() => {
-            tags.forEach(tag => this._store_tag(tag));
-        });
-    }), RESOLVE_DELAY);*/
     setInterval(async () => {
       const tags = Object.values(this._pending[0]);
       if (tags.length === 0) {
@@ -443,7 +406,7 @@ class TagList {
     return [...Object.values(this._state[0]), ...Object.values(this._pending[0])];
   }
   get tag_string() {
-    return this.tags.map(t => t.display_name()).join(" ");
+    return this.tags.map(t => t.tag_string()).join(" ");
   }
   get tag_names() {
     return this.tags.map(t => t.tag_string());
@@ -480,43 +443,6 @@ class TagList {
       this._remove_tag(tag);
     }
   }
-
-  /*
-  
-  public add_tag(tag: Tag) {
-      this.add_tags([ tag ]);
-  }
-   public add_tags(tags: Tag[]) {
-      TagRegistry.store_tags(tags);
-       tags.map(t => this._store_tag(t));
-  }
-    public remove_tags(tags: Tag[]) {
-      tags.forEach(tag => this._remove_tag(tag));
-  }
-   public has_tag(tag: string | Tag): boolean {
-      return this._has_tag(Tag.parse_tag(tag));
-  }
-   
-   
-   
-   
-   public has_pending(): boolean {
-      for (const tag of Object.values(this._state[0])) {
-          if (tag instanceof NotFoundTag || tag instanceof PendingTag) {
-              return true;
-          }
-      }
-       return false;
-  }
-   public has_deprecated(): boolean {
-      for (const tag of Object.values(this._state[0])) {
-          if (tag instanceof FullDataTag && tag.deprecated) {
-              return true;
-          }
-      }
-       return false;
-  }*/
-
   async _resolve_pending(tags) {
     const PAGE_SIZE = 1000;
     if (tags.length > 1000) {
@@ -1148,7 +1074,6 @@ class BetterTagBoxFeature extends Feature {
             return _self$.tag_list.filter(cb).sort();
           },
           children: tag => {
-            //const settings = tag.render_settings();
             return web.createComponent(web.Dynamic, {
               component: "li",
               get ["class"]() {
@@ -1222,13 +1147,17 @@ class BetterTagBoxFeature extends Feature {
   }
   async _autocomplete_source(query) {
     const is_negated = query[0] === "-";
-    const res = await $.get("/autocomplete", {
+    const param = $.param({
       "search[query]": is_negated ? query.slice(1) : query,
       "search[type]": "tag_query",
       "version": "1",
       "limit": "20"
     });
-    const items = $(res).find("li").toArray().map(e => $(e));
+    const res = await fetch(`/autocomplete?${param}`, {
+      method: "GET",
+      mode: "same-origin"
+    });
+    const items = $(await res.text()).find("li").toArray().map(e => $(e));
     items.forEach(e => e.data("original-query", query).data("is-negated", is_negated));
     return items;
   }

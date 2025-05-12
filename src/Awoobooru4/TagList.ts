@@ -166,55 +166,6 @@ export class TagList {
         }
     }
 
-    /*
-    
-    public add_tag(tag: Tag) {
-        this.add_tags([ tag ]);
-    }
-
-    public add_tags(tags: Tag[]) {
-        TagRegistry.store_tags(tags);
-
-        tags.map(t => this._store_tag(t));
-    }
-
-
-    public remove_tags(tags: Tag[]) {
-        tags.forEach(tag => this._remove_tag(tag));
-    }
-
-    public has_tag(tag: string | Tag): boolean {
-        return this._has_tag(Tag.parse_tag(tag));
-    }
-
-    
-
-    
-
-    
-
-    
-
-    public has_pending(): boolean {
-        for (const tag of Object.values(this._state[0])) {
-            if (tag instanceof NotFoundTag || tag instanceof PendingTag) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    public has_deprecated(): boolean {
-        for (const tag of Object.values(this._state[0])) {
-            if (tag instanceof FullDataTag && tag.deprecated) {
-                return true;
-            }
-        }
-
-        return false;
-    }*/
-
     private async _resolve_pending(tags: NormalTag[]): Promise<NormalTag[]> {
         const PAGE_SIZE = 1000;
 

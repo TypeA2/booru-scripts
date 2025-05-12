@@ -481,15 +481,10 @@ export default class BetterTagBoxFeature extends Feature {
                 {cb =>
                     <For each={this.tag_list.filter(cb).sort()}>
                     {tag => {
-                        //const settings = tag.render_settings();
                         return <Dynamic
                             component="li"
                             class={`awoo-tag ${tag.class_string()} ${this._error_tags().has(tag.tag_string()) ? "awoo-tag-error" : ""}`}
                             data-tag-string={tag.tag_string()}
-                            //data-unique-name={tag.unique_name()}
-                            //data-display-name={tag.display_name()}
-                            //data-base-name={tag.search_string()}
-                            //{...settings.properties}>
                             >
                             {/* 7x nbsp seems to work lol */}
                             <Show when={!(tag instanceof MetaTag && tag.key === "rating")} fallback="&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;">
@@ -535,6 +530,7 @@ export default class BetterTagBoxFeature extends Feature {
 
         const res = await fetch(`/autocomplete?${param}`, {
             method: "GET",
+            mode: "same-origin",
         });
 
         const items = $(await res.text()).find("li").toArray().map(e => $(e));
