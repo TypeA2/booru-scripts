@@ -8,7 +8,7 @@ import BetterTagBoxFeature from "./BetterTagBox";
 import OneUpFeature from "./OneUp";
 import PanzoomFeature from "./Panzoom";
 import Feature from './Feature';
-import UITweaks from './UiTweaks';
+import UITweaks from './UITweaks';
 
 const feature_mapping: { [key in Page]: (typeof Feature)[] } = {
     [Page.UploadSingle]: [ BetterTagBoxFeature, OneUpFeature, PanzoomFeature ],
