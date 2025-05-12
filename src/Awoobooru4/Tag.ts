@@ -238,7 +238,11 @@ export class NormalTag extends Tag {
     }
 
     public tag_string(): string {
-        return `${this.is_add ? "" : "-"}${this.is_new ? this._tag_category + ":" : ""}${this._tag_name}`;
+        let res = this.is_add ? "" : "-";
+        if (this.is_new && this._tag_category !== "unknown") {
+            res += this._tag_category + ":";
+        }
+        return res + this._tag_name;
     }
 
     public search_string(): string {

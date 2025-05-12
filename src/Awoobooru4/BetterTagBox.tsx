@@ -362,7 +362,7 @@ export default class BetterTagBoxFeature extends Feature {
     private _edit_tag(tag: Tag) {
         this.tag_list.remove_tag(tag);
 
-        const value = tag.tag_string();
+        const value = tag.display_name();
 
         const tag_box: JQuery<HTMLInputElement> = $("#awoo-tag-box");
         tag_box.val(value);

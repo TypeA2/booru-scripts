@@ -277,7 +277,11 @@ class NormalTag extends Tag {
     return this._tag_name;
   }
   tag_string() {
-    return `${this.is_add ? "" : "-"}${this.is_new ? this._tag_category + ":" : ""}${this._tag_name}`;
+    let res = this.is_add ? "" : "-";
+    if (this.is_new && this._tag_category !== "unknown") {
+      res += this._tag_category + ":";
+    }
+    return res + this._tag_name;
   }
   search_string() {
     return this._tag_name;
@@ -439,7 +443,7 @@ class TagList {
     return [...Object.values(this._state[0]), ...Object.values(this._pending[0])];
   }
   get tag_string() {
-    return this.tags.map(t => t.tag_string()).join(" ");
+    return this.tags.map(t => t.display_name()).join(" ");
   }
   get tag_names() {
     return this.tags.map(t => t.tag_string());
@@ -1027,7 +1031,7 @@ class BetterTagBoxFeature extends Feature {
   }
   _edit_tag(tag) {
     this.tag_list.remove_tag(tag);
-    const value = tag.tag_string();
+    const value = tag.display_name();
     const tag_box = $("#awoo-tag-box");
     tag_box.val(value);
     tag_box.select();

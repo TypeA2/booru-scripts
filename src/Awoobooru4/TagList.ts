@@ -15,12 +15,6 @@ export class TagList {
         this._state = createStore<TagListState>({});
         this._pending = createStore<PendingState>({});
 
-        // TODO this breaks if more than 1 tag list exists (does it?)
-        /*setInterval(() => TagRegistry.resolve_pending(tags => {
-            batch(() => {
-                tags.forEach(tag => this._store_tag(tag));
-            });
-        }), RESOLVE_DELAY);*/
         setInterval(async () => {
             const tags = Object.values(this._pending[0]);
 
