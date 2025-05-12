@@ -525,14 +525,19 @@ export default class BetterTagBoxFeature extends Feature {
 
     private async _autocomplete_source(query: string): Promise<JQuery<HTMLLIElement>[]> {
         const is_negated = query[0] === "-";
-        const res = await $.get("/autocomplete", {
+
+        const param = $.param({
             "search[query]": is_negated ? query.slice(1) : query,
             "search[type]": "tag_query",
             "version": "1",
             "limit": "20"
-        }) as HTMLUListElement;
+        });
 
-        const items = $(res).find("li").toArray().map(e => $(e));
+        const res = await fetch(`/autocomplete?${param}`, {
+            method: "GET",
+        });
+
+        const items = $(await res.text()).find("li").toArray().map(e => $(e));
 
         items.forEach(e => e.data("original-query", query).data("is-negated", is_negated));
         return items;
