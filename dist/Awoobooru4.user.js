@@ -324,10 +324,17 @@ class TagList {
 
       // FIXME: This is inefficient, but batch() seems to break it somehow
       res.forEach(tag => {
-        this._remove_pending(tag);
-        this._store_tag(tag);
+        /* Got removed in the meantime
+         * This is slightly race-condition-y but not critical so it's fine
+         **/
+        if (this._has_pending(tag)) {
+          this._remove_pending(tag);
+          this._store_tag(tag);
+        }
         delete remaining_tags[tag.unique_name()];
       });
+
+      /* Not found */
       Object.values(remaining_tags).forEach(tag => {
         tag.is_new = true;
         this._remove_pending(tag);
@@ -843,7 +850,9 @@ class BetterTagBoxFeature extends Feature {
   }
   _toggle_tag(e) {
     e.preventDefault();
-    const tag = $(e.target).data("tag-name");
+    e.stopImmediatePropagation();
+    const tag = $(e.target).closest("li").find("a").data("tag-name");
+    logger$4.info("Toggling", tag);
     if (this.tag_list.contains(tag)) {
       this.tag_list.remove_tag(tag);
     } else {
@@ -1210,6 +1219,9 @@ class BetterTagBoxFeature extends Feature {
     $(document).off("click.danbooru", ".related-tags .tag-list a");
     Danbooru.RelatedTag.update_selected = _ => this._update_selected_tags();
     Danbooru.RelatedTag.toggle_tag = e => this._toggle_tag(e);
+
+    /* Just intercept all related tags clicks, this results in more consistent behavior */
+    $("#related-tags-container").on("click", "a[data-tag-name]", e => this._toggle_tag(e));
     const initial_tags = sanitize_tag_string($("#post_tag_string").val() || "");
     const initial_parent = $("#post_parent_id").val();
     if (initial_parent) {

@@ -213,10 +213,13 @@ export default class BetterTagBoxFeature extends Feature {
         });
     }
 
-    private _toggle_tag(e: InputEvent): void {
+    private _toggle_tag(e: Event): void {
         e.preventDefault();
+        e.stopImmediatePropagation();
 
-        const tag: string = $(e.target).data("tag-name");
+        const tag: string = $(e.target).closest("li").find("a").data("tag-name");
+
+        logger.info("Toggling", tag);
 
         if (this.tag_list.contains(tag)) {
             this.tag_list.remove_tag(tag);
@@ -601,6 +604,9 @@ export default class BetterTagBoxFeature extends Feature {
 
         Danbooru.RelatedTag.update_selected = _ => this._update_selected_tags();
         Danbooru.RelatedTag.toggle_tag = e => this._toggle_tag(e);
+
+        /* Just intercept all related tags clicks, this results in more consistent behavior */
+        $("#related-tags-container").on("click", "a[data-tag-name]", e => this._toggle_tag(e as unknown as Event));
 
         const initial_tags = sanitize_tag_string($("#post_tag_string").val() as string || "");
         const initial_parent = $("#post_parent_id").val();

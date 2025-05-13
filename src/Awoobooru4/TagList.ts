@@ -29,11 +29,18 @@ export class TagList {
 
             // FIXME: This is inefficient, but batch() seems to break it somehow
             res.forEach(tag => {
-                this._remove_pending(tag);
-                this._store_tag(tag);
+                /* Got removed in the meantime
+                 * This is slightly race-condition-y but not critical so it's fine
+                 **/
+                if (this._has_pending(tag)) {
+                    this._remove_pending(tag);
+                    this._store_tag(tag);
+                }
+                
                 delete remaining_tags[tag.unique_name()];
             });
 
+            /* Not found */
             Object.values(remaining_tags).forEach(tag => {
                 tag.is_new = true;
                 this._remove_pending(tag);
