@@ -3,7 +3,7 @@
 // @namespace   https://github.com/TypeA2/booru-scripts
 // @match       *://*.donmai.us/*
 // @match       *://cos.lycore.co/*
-// @version     4.0.5b
+// @version     4.0.6b
 // @author      TypeA2
 // @description Various utilities to make life easier
 // @require     https://cdn.jsdelivr.net/npm/@violentmonkey/dom@2
@@ -961,7 +961,8 @@ class BetterTagBoxFeature extends Feature {
     this._tag_box_value = "";
   }
   _set_tag_string(tags) {
-    this.tag_list.clear();
+    // this.tag_list.clear();
+
     this.tag_list.apply_tags(sanitize_tag_string(tags).map(Tag.parse_tag));
   }
   _edit_tag(tag) {

@@ -357,7 +357,7 @@ export default class BetterTagBoxFeature extends Feature {
     }
 
     private _set_tag_string(tags: string) {
-        this.tag_list.clear();
+        // this.tag_list.clear();
 
         this.tag_list.apply_tags(sanitize_tag_string(tags).map(Tag.parse_tag));
     }
