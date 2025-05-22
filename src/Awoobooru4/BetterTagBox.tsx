@@ -200,11 +200,11 @@ export default class BetterTagBoxFeature extends Feature {
 
         /// No commentary tags despite being applicable
         if (!tags.has("commentary") && !tags.has("commentary_request") && !tags.has("symbol-only_commentary")
-            && ($("#post_artist_commentary_title").val() || $("#post_artist_commentary_desc").val())) {
+            && ($("#post_artist_commentary_title,#artist_commentary_original_title").val() || $("#post_artist_commentary_desc,#artist_commentary_original_description").val())) {
         
             ret = false;
 
-            const commentary = ($("#post_artist_commentary_title").val() as string + $("#post_artist_commentary_desc").val() as string).trim();
+            const commentary = ($("#post_artist_commentary_title,#artist_commentary_original_title").val() as string + $("#post_artist_commentary_desc,#artist_commentary_original_description").val() as string).trim();
             notice.push(`No commentary tags: "${commentary.slice(0, 10)}${commentary.length > 10 ? "..." : ""}"`);
         }
 
@@ -215,6 +215,23 @@ export default class BetterTagBoxFeature extends Feature {
             notice.push("No (partial) commentary tag");
         }
         ///
+
+        /// Commentary despite there being none
+        // TODO: Handle specific *_commentary tags
+        if (!($("#post_artist_commentary_title,#artist_commentary_original_title").val() || $("#post_artist_commentary_desc,#artist_commentary_original_description").val())
+            && (tags.has("commentary") || tags.has("commentary_request") || tags.has("partial_commentary"))) {
+            ret = false;
+
+            const which: string[] = [];
+
+            if (tags.has("commentary")) which.push("commentary");
+            if (tags.has("commentary_request")) which.push("commentary_request");
+            if (tags.has("partial_commentary")) which.push("partial_commentary");
+
+            notice.push(`Unneeded commentary tags: ${which.join(", ")}`);
+
+            which.forEach(t => error_tags.add(t));
+        }
 
         this._set_notice(notice);
         this._set_error_tags(error_tags);
