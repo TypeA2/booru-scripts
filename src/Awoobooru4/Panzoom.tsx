@@ -6,7 +6,10 @@ import css from "./Panzoom.scss";
 
 import { type PanZoom } from "panzoom";
 
-/* Based on hdk5's panzoom */
+/**
+ * Based on hdk5's panzoom:
+ * https://github.com/hdk5/danbooru.user.js/blob/master/dist/mediaasset-panzoom.user.js
+ */
 
 const logger = new Logger("Panzoom");
 
