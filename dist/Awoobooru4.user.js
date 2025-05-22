@@ -3,7 +3,7 @@
 // @namespace   https://github.com/TypeA2/booru-scripts
 // @match       *://*.donmai.us/*
 // @match       *://cos.lycore.co/*
-// @version     4.0.7b
+// @version     4.0.8b
 // @author      TypeA2
 // @description Various utilities to make life easier
 // @require     https://cdn.jsdelivr.net/npm/@violentmonkey/dom@2
@@ -257,7 +257,7 @@ class NormalTag extends Tag {
     return this._tag_name;
   }
   class_string() {
-    if (this.is_new && this._tag_category === "unknown") {
+    if (this._is_deprecated || this.is_new && this._tag_category === "unknown") {
       return "awoo-tag-error";
     }
     return "";
@@ -838,9 +838,9 @@ class BetterTagBoxFeature extends Feature {
     ///
 
     /// No commentary tags despite being applicable
-    if (!tags.has("commentary") && !tags.has("commentary_request") && !tags.has("symbol-only_commentary") && ($("#post_artist_commentary_title").val() || $("#post_artist_commentary_desc").val())) {
+    if (!tags.has("commentary") && !tags.has("commentary_request") && !tags.has("symbol-only_commentary") && ($("#post_artist_commentary_title,#artist_commentary_original_title").val() || $("#post_artist_commentary_desc,#artist_commentary_original_description").val())) {
       ret = false;
-      const commentary = ($("#post_artist_commentary_title").val() + $("#post_artist_commentary_desc").val()).trim();
+      const commentary = ($("#post_artist_commentary_title,#artist_commentary_original_title").val() + $("#post_artist_commentary_desc,#artist_commentary_original_description").val()).trim();
       notice.push(`No commentary tags: "${commentary.slice(0, 10)}${commentary.length > 10 ? "..." : ""}"`);
     }
     if (($("#post_translated_commentary_title").val() || $("#post_translated_commentary_desc").val()) && !tags.has("commentary") && !tags.has("partial_commentary")) {
@@ -849,6 +849,17 @@ class BetterTagBoxFeature extends Feature {
     }
     ///
 
+    /// Commentary despite there being none
+    // TODO: Handle specific *_commentary tags
+    if (!($("#post_artist_commentary_title,#artist_commentary_original_title").val() || $("#post_artist_commentary_desc,#artist_commentary_original_description").val()) && (tags.has("commentary") || tags.has("commentary_request") || tags.has("partial_commentary"))) {
+      ret = false;
+      const which = [];
+      if (tags.has("commentary")) which.push("commentary");
+      if (tags.has("commentary_request")) which.push("commentary_request");
+      if (tags.has("partial_commentary")) which.push("partial_commentary");
+      notice.push(`Unneeded commentary tags: ${which.join(", ")}`);
+      which.forEach(t => error_tags.add(t));
+    }
     this._set_notice(notice);
     this._set_error_tags(error_tags);
     return ret;
@@ -1104,7 +1115,7 @@ class BetterTagBoxFeature extends Feature {
             return web.createComponent(web.Dynamic, {
               component: "li",
               get ["class"]() {
-                return `awoo-tag ${tag.class_string()} ${_self$._error_tags().has(tag.tag_string()) ? "awoo-tag-error" : ""}`;
+                return `awoo-tag ${tag.class_string()}${_self$._error_tags().has(tag.tag_string()) ? " awoo-tag-error" : ""}`;
               },
               get ["data-tag-string"]() {
                 return tag.tag_string();
@@ -1458,7 +1469,10 @@ class OneUpFeature extends Feature {
   }
 }
 web.delegateEvents(["click"]);var css_248z$1 = ".media-asset-component{--maybe-max-height:calc(100vh - max(1rem, var(--header-visible-height)));--height:calc(max(var(--min-asset-height), var(--maybe-max-height)));max-height:var(--height)!important;min-height:var(--height)!important;overflow:hidden!important;position:sticky!important}.media-asset-component .media-asset-container{height:100%!important;width:100%!important}.media-asset-component .media-asset-zoom-level{cursor:pointer;pointer-events:all;z-index:1}.media-asset-component .media-asset-image{cursor:default;max-height:100%!important;max-width:100%!important}.media-asset-component .media-asset-panzoom{align-items:center;display:flex;flex:1;height:100%;justify-content:center;width:100%}.upload-image-container{overflow-x:hidden}";var _tmpl$$1 = /*#__PURE__*/web.template(`<div class=media-asset-panzoom>`);
-/* Based on hdk5's panzoom */
+/**
+ * Based on hdk5's panzoom:
+ * https://github.com/hdk5/danbooru.user.js/blob/master/dist/mediaasset-panzoom.user.js
+ */
 
 const logger$2 = new Logger("Panzoom");
 class PanzoomFeature extends Feature {
