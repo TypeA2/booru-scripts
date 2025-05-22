@@ -3,7 +3,7 @@
 // @namespace   https://github.com/TypeA2/booru-scripts
 // @match       *://*.donmai.us/*
 // @match       *://cos.lycore.co/*
-// @version     4.0.6b
+// @version     4.0.7b
 // @author      TypeA2
 // @description Various utilities to make life easier
 // @require     https://cdn.jsdelivr.net/npm/@violentmonkey/dom@2
@@ -725,7 +725,7 @@ function node_is_html(node) {
 const GIRL_CHARCOUNTERS = new Set(["1girl", "2girls", "3girls", "4girls", "5girls", "6+girls"]);
 const BOY_CHARCOUNTERS = new Set(["1boy", "2boys", "3boys", "4boys", "5boys", "6+boys"]);
 const OTHER_CHARCOUNTERS = new Set(["1other", "2others", "3others", "4others", "5others", "6+others"]);
-const MUTUALLY_EXCLUSIVE = [GIRL_CHARCOUNTERS, BOY_CHARCOUNTERS, OTHER_CHARCOUNTERS, ["commentary_request", "commentary"]].map(e => new Set(e));
+const MUTUALLY_EXCLUSIVE = [[...GIRL_CHARCOUNTERS], [...BOY_CHARCOUNTERS], [...OTHER_CHARCOUNTERS], [["commentary_request", "partial_commentary"], "commentary"], ["solo", [...GIRL_CHARCOUNTERS.difference(new Set(["1girl"]))]], ["solo", [...BOY_CHARCOUNTERS.difference(new Set(["1boy"]))]], ["solo", [...OTHER_CHARCOUNTERS.difference(new Set(["1other"]))]]];
 class BetterTagBoxFeature extends Feature {
   constructor() {
     super("BetterTagBox");
@@ -800,14 +800,31 @@ class BetterTagBoxFeature extends Feature {
     const tags = new Set(this.tag_list.tag_names);
     for (const group of MUTUALLY_EXCLUSIVE) {
       const matches = [];
-      for (const tag of tags) {
-        if (group.has(tag)) {
-          matches.push(tag);
+      for (const item of group) {
+        if (typeof item === "string") {
+          for (const tag of tags) {
+            if (item === tag) {
+              matches.push(tag);
+              /* Tags are unique aslready */
+              break;
+            }
+          }
+        } else {
+          const submatches = [];
+          for (const tag of tags) {
+            if (item.includes(tag)) {
+              submatches.push(tag);
+            }
+          }
+          if (submatches.length > 0) {
+            matches.push(submatches);
+          }
         }
       }
       if (matches.length > 1) {
-        notice.push(`Conflicting tags: ${matches.sort().join(", ")}`);
-        matches.forEach(match => error_tags.add(match));
+        const flat_matches = matches.flat();
+        notice.push(`Conflicting tags: ${flat_matches.sort().join(", ")}`);
+        flat_matches.forEach(match => error_tags.add(match));
       }
     }
 

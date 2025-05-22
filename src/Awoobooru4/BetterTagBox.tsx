@@ -49,12 +49,15 @@ const GIRL_CHARCOUNTERS  = new Set([ "1girl",  "2girls",  "3girls",  "4girls",  
 const BOY_CHARCOUNTERS   = new Set([ "1boy",   "2boys",   "3boys",   "4boys",   "5boys",   "6+boys"   ]);
 const OTHER_CHARCOUNTERS = new Set([ "1other", "2others", "3others", "4others", "5others", "6+others" ]);
 
-const MUTUALLY_EXCLUSIVE = [
-    GIRL_CHARCOUNTERS,
-    BOY_CHARCOUNTERS,
-    OTHER_CHARCOUNTERS,
-    [ "commentary_request", "commentary" ]
-].map(e => new Set(e));
+const MUTUALLY_EXCLUSIVE: (string | string[])[][] = [
+    [ ...GIRL_CHARCOUNTERS ],
+    [ ...BOY_CHARCOUNTERS ],
+    [ ...OTHER_CHARCOUNTERS ],
+    [ [ "commentary_request", "partial_commentary" ], "commentary" ],
+    [ "solo", [ ...GIRL_CHARCOUNTERS.difference(new Set([ "1girl" ]))] ],
+    [ "solo", [ ...BOY_CHARCOUNTERS.difference(new Set([ "1boy" ]))] ],
+    [ "solo", [ ...OTHER_CHARCOUNTERS.difference(new Set([ "1other" ]))] ],
+];
 
 export default class BetterTagBoxFeature extends Feature {
     public constructor() {
@@ -147,19 +150,41 @@ export default class BetterTagBoxFeature extends Feature {
         /// No mutually exclusive tags
         const tags = new Set(this.tag_list.tag_names);
 
+        let i = 0;
         for (const group of MUTUALLY_EXCLUSIVE) {
-            const matches: string[] = [];
+            ++i;
 
-            for (const tag of tags) {
-                if (group.has(tag)) {
-                    matches.push(tag);
+            const matches: (string | string[])[] = [];
+
+            for (const item of group) {
+                if (typeof item === "string") {
+                    for (const tag of tags) {
+                        if (item === tag) {
+                            matches.push(tag);
+                            /* Tags are unique aslready */
+                            break;
+                        }
+                    }
+                } else {
+                    const submatches: string[] = [];
+                    for (const tag of tags) {
+                        if (item.includes(tag)) {
+                            submatches.push(tag);
+                        }
+                    }
+
+                    if (submatches.length > 0) {
+                        matches.push(submatches);
+                    }
                 }
             }
 
             if (matches.length > 1) {
-                notice.push(`Conflicting tags: ${matches.sort().join(", ")}`);
+                const flat_matches = matches.flat();
+                
+                notice.push(`Conflicting tags: ${flat_matches.sort().join(", ")}`);
 
-                matches.forEach(match => error_tags.add(match));
+                flat_matches.forEach(match => error_tags.add(match));
             }
         }
     
