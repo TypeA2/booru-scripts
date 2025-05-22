@@ -122,7 +122,7 @@ export default class BetterTagBoxFeature extends Feature {
         }
 
         ret &&= ((deprecated_tags.length === 0) && (pending_tags.length === 0) && (unknown_tags.length === 0));
-        
+
         if (deprecated_tags.length > 0) notice.push(`Deprecated: ${deprecated_tags.join(", ")}`);
         // This would be annoying
         // if (   pending_tags.length > 0) notice.push(`Pending: ${pending_tags.join(", ")}`);
@@ -511,7 +511,7 @@ export default class BetterTagBoxFeature extends Feature {
                     {tag => {
                         return <Dynamic
                             component="li"
-                            class={`awoo-tag ${tag.class_string()} ${this._error_tags().has(tag.tag_string()) ? "awoo-tag-error" : ""}`}
+                            class={`awoo-tag ${tag.class_string()}${this._error_tags().has(tag.tag_string()) ? " awoo-tag-error" : ""}`}
                             data-tag-string={tag.tag_string()}
                             >
                             {/* 7x nbsp seems to work lol */}

@@ -220,7 +220,7 @@ export class NormalTag extends Tag {
     }
 
     public class_string(): string {
-        if (this.is_new && this._tag_category === "unknown") {
+        if (this._is_deprecated || this.is_new && this._tag_category === "unknown") {
             return "awoo-tag-error";
         }
 
