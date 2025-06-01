@@ -317,6 +317,7 @@ export default class BetterTagBoxFeature extends Feature {
         switch (e.key) {
             case "Enter":
                 this._try_add_tag(this._tag_box_value);
+                this._tag_list_updated();
 
                 if (e.ctrlKey) {
                     e.preventDefault();
