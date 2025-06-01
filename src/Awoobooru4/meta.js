@@ -7,7 +7,7 @@
 // @grant       GM_getValue
 // @grant       GM_setValue
 // @grant       GM_addStyle
-// @version     4.0.8b
+// @version     4.0.9b
 // @author      TypeA2
 // @description Various utilities to make life easier
 // @require     https://cdn.jsdelivr.net/npm/@violentmonkey/dom@2

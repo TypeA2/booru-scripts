@@ -316,6 +316,7 @@ export default class BetterTagBoxFeature extends Feature {
     private _tag_box_keydown(e: KeyboardEvent) {
         switch (e.key) {
             case "Enter":
+                this._try_add_tag(this._tag_box_value);
 
                 if (e.ctrlKey) {
                     e.preventDefault();
@@ -328,8 +329,7 @@ export default class BetterTagBoxFeature extends Feature {
                     }
                     return;
                 }
-                
-                /* Fallthrough */
+                break;
 
             case " ":
                 e.preventDefault();

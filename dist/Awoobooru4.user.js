@@ -3,7 +3,7 @@
 // @namespace   https://github.com/TypeA2/booru-scripts
 // @match       *://*.donmai.us/*
 // @match       *://cos.lycore.co/*
-// @version     4.0.8b
+// @version     4.0.9b
 // @author      TypeA2
 // @description Various utilities to make life easier
 // @require     https://cdn.jsdelivr.net/npm/@violentmonkey/dom@2
@@ -924,6 +924,7 @@ class BetterTagBoxFeature extends Feature {
   _tag_box_keydown(e) {
     switch (e.key) {
       case "Enter":
+        this._try_add_tag(this._tag_box_value);
         if (e.ctrlKey) {
           e.preventDefault();
           const submit_btn = $("#form input[type='submit']");
@@ -934,9 +935,7 @@ class BetterTagBoxFeature extends Feature {
           }
           return;
         }
-
-      /* Fallthrough */
-
+        break;
       case " ":
         e.preventDefault();
         this._try_add_tag(this._tag_box_value);
