@@ -571,7 +571,8 @@ export default class BetterTagBoxFeature extends Feature {
         const param = $.param({
             "search[query]": is_negated ? query.slice(1) : query,
             "search[type]": "tag_query",
-            "limit": "20"
+            "limit": Danbooru.Autocomplete.MAX_RESULTS,
+            "version": Danbooru.Autocomplete.VERSION
         });
 
         const res = await fetch(`/autocomplete?${param}`, {
@@ -595,6 +596,7 @@ export default class BetterTagBoxFeature extends Feature {
                 delay: 0,
                 minLength: 1,
                 autoFocus: false,
+                classes: { "ui-autocomplete": "absolute cursor-pointer max-w-480px max-h-480px text-sm border shadow-lg thin-scrollbar", },
                 focus: () => false,
             },
             _create: function () {

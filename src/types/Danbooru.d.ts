@@ -26,4 +26,9 @@ declare namespace Danbooru {
                         | "receive-email-notifications" | "requires-verification" | "save-data"
                         | "show-deleted-children" | "show-deleted-posts"): boolean;
     }
+
+    declare namespace Autocomplete {
+        declare const VERSION: number;
+        declare const MAX_RESULTS: number;
+    }
 }
