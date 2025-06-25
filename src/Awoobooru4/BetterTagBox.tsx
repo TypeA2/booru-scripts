@@ -1,3 +1,4 @@
+/* eslint-disable solid/jsx-no-script-url */
 import { For, createEffect, Show, createSignal, Accessor, Setter } from "solid-js";
 import Feature from "./Feature";
 import Options from "./Options";
@@ -496,17 +497,17 @@ export default class BetterTagBoxFeature extends Feature {
         return <>
             <input type="text" id="awoo-tag-box" onKeyDown={e => { this._tag_box_keydown(e);} } />
             <span id="awoo-copy-controls">
-                <a href="#" onClick={async e => {
+                <a href="javascript:void()" onClick={async e => {
                     e.preventDefault();
                     await navigator.clipboard.writeText(this.tag_list.tag_string);
-                    Danbooru.Utility.notice("Tags copied", false);
+                    Danbooru.Utility.notice("Tags copied");
                     $(e.target).blur();
                 }}>Copy tags</a>
                 &nbsp;-&nbsp;
-                <a href="#" onClick={async e => {
+                <a href="javascript:void()" onClick={async e => {
                     e.preventDefault();
                     this._set_tag_string(await navigator.clipboard.readText());
-                    Danbooru.Utility.notice("Tags pasted", false);
+                    Danbooru.Utility.notice("Tags pasted");
                     $(e.target).blur();
                 }}>Paste tags</a>
             </span>
@@ -570,7 +571,6 @@ export default class BetterTagBoxFeature extends Feature {
         const param = $.param({
             "search[query]": is_negated ? query.slice(1) : query,
             "search[type]": "tag_query",
-            "version": "1",
             "limit": "20"
         });
 

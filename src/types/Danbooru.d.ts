@@ -1,11 +1,13 @@
 declare namespace Danbooru {
+    function notice(msg: string): void;
+    function error(msg: string): void;
+
     declare namespace Utility {
-        function delay(ms: number): Promise<void>;
         function meta(key: string): string;
         function test_max_width(width: number): boolean;
 
-        function notice(msg: string | HTMLElement | JSXElement, permanent: boolean): void;
-        function error(msg: string | HTMLElement | JSXElement): void;
+        function notice(msg: string): void;
+        function error(msg: string): void;
     }
 
     declare namespace RelatedTag {

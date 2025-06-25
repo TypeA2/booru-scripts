@@ -2,6 +2,7 @@ import Feature from "./Feature";
 import Logger from "./Logger";
 import Options from "./Options";
 import { sanitize_tag_string } from "./Tag";
+import { notice } from "./Util";
 
 const logger = new Logger("OneUp");
 
@@ -98,19 +99,19 @@ export default class OneUpFeature extends Feature {
         $(".tab.source-tab")[0].click();
 
         if (was_translated) {
-            Danbooru.Utility.notice(<>
+            notice(<>
                 <span> Tags copied. Please check the </span>
                 <a class="tag-type-5" href="/wiki_pages/commentary" target="_blank">commentary</a>
                 <span> and </span>
                 <a class="tag-type-5" href="/wiki_pages/translation_request" target="_blank">translation</a>
                 <span> tags.</span>
-            </>, false);
+            </>);
         } else {
-            Danbooru.Utility.notice(<>
+            notice(<>
                 <span> Tags copied. Please check the </span>
                 <a class="tag-type-5" href="/wiki_pages/commentary" target="_blank">commentary</a>
                 <span> tags.</span>
-            </>, false);
+            </>);
         }
     }
 
