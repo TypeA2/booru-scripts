@@ -3,7 +3,7 @@
 // @namespace   https://github.com/TypeA2/booru-scripts
 // @match       *://*.donmai.us/*
 // @match       *://cos.lycore.co/*
-// @version     4.0.12
+// @version     4.0.13
 // @author      TypeA2
 // @description Various utilities to make life easier
 // @require     https://cdn.jsdelivr.net/npm/@violentmonkey/dom@2
@@ -838,9 +838,9 @@ class BetterTagBoxFeature extends Feature {
     ///
 
     /// No commentary tags despite being applicable
-    if (!tags.has("commentary") && !tags.has("commentary_request") && !tags.has("symbol-only_commentary") && ($("#post_artist_commentary_title,#artist_commentary_original_title").val() || $("#post_artist_commentary_desc,#artist_commentary_original_description").val())) {
+    if (!tags.has("commentary") && !tags.has("commentary_request") && !tags.has("symbol-only_commentary") && ($("#post_artist_commentary_original_title,#artist_commentary_original_title").val() || $("#post_artist_commentary_original_description,#artist_commentary_original_description").val())) {
       ret = false;
-      const commentary = ($("#post_artist_commentary_title,#artist_commentary_original_title").val() + $("#post_artist_commentary_desc,#artist_commentary_original_description").val()).trim();
+      const commentary = ($("#post_artist_commentary_original_title,#artist_commentary_original_title").val() + $("#post_artist_commentary_original_description,#artist_commentary_original_description").val()).trim();
       notice.push(`No commentary tags: "${commentary.slice(0, 10)}${commentary.length > 10 ? "..." : ""}"`);
     }
     if (($("#post_translated_commentary_title").val() || $("#post_translated_commentary_desc").val()) && !tags.has("commentary") && !tags.has("partial_commentary")) {
@@ -851,7 +851,7 @@ class BetterTagBoxFeature extends Feature {
 
     /// Commentary despite there being none
     // TODO: Handle specific *_commentary tags
-    if (!($("#post_artist_commentary_title,#artist_commentary_original_title").val() || $("#post_artist_commentary_desc,#artist_commentary_original_description").val()) && (tags.has("commentary") || tags.has("commentary_request") || tags.has("partial_commentary"))) {
+    if (!($("#post_artist_commentary_original_title,#artist_commentary_original_title").val() || $("#post_artist_commentary_original_description,#artist_commentary_original_description").val()) && (tags.has("commentary") || tags.has("commentary_request") || tags.has("partial_commentary"))) {
       ret = false;
       const which = [];
       if (tags.has("commentary")) which.push("commentary");
@@ -1003,8 +1003,8 @@ class BetterTagBoxFeature extends Feature {
     tag_box.autocomplete("search", value);
   }
   async _commentary_changed() {
-    const source_title = $("#post_artist_commentary_title").val();
-    const source_description = $("#post_artist_commentary_desc").val();
+    const source_title = $("#post_artist_commentary_original_title").val();
+    const source_description = $("#post_artist_commentary_original_description").val();
 
     /* Check for hashtag-only */
     let hashtag_only = true;
@@ -1333,7 +1333,7 @@ class BetterTagBoxFeature extends Feature {
             }).observe($(".source-data")[0].parentElement, {
               childList: true
             });
-            $("#post_artist_commentary_title,#post_artist_commentary_desc").on("change", _ => this._commentary_changed());
+            $("#post_artist_commentary_original_title,#post_artist_commentary_original_description").on("change", _ => this._commentary_changed());
           }
           break;
         }

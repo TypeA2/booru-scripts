@@ -201,11 +201,11 @@ export default class BetterTagBoxFeature extends Feature {
 
         /// No commentary tags despite being applicable
         if (!tags.has("commentary") && !tags.has("commentary_request") && !tags.has("symbol-only_commentary")
-            && ($("#post_artist_commentary_title,#artist_commentary_original_title").val() || $("#post_artist_commentary_desc,#artist_commentary_original_description").val())) {
+            && ($("#post_artist_commentary_original_title,#artist_commentary_original_title").val() || $("#post_artist_commentary_original_description,#artist_commentary_original_description").val())) {
         
             ret = false;
 
-            const commentary = ($("#post_artist_commentary_title,#artist_commentary_original_title").val() as string + $("#post_artist_commentary_desc,#artist_commentary_original_description").val() as string).trim();
+            const commentary = ($("#post_artist_commentary_original_title,#artist_commentary_original_title").val() as string + $("#post_artist_commentary_original_description,#artist_commentary_original_description").val() as string).trim();
             notice.push(`No commentary tags: "${commentary.slice(0, 10)}${commentary.length > 10 ? "..." : ""}"`);
         }
 
@@ -219,7 +219,7 @@ export default class BetterTagBoxFeature extends Feature {
 
         /// Commentary despite there being none
         // TODO: Handle specific *_commentary tags
-        if (!($("#post_artist_commentary_title,#artist_commentary_original_title").val() || $("#post_artist_commentary_desc,#artist_commentary_original_description").val())
+        if (!($("#post_artist_commentary_original_title,#artist_commentary_original_title").val() || $("#post_artist_commentary_original_description,#artist_commentary_original_description").val())
             && (tags.has("commentary") || tags.has("commentary_request") || tags.has("partial_commentary"))) {
             ret = false;
 
@@ -419,8 +419,8 @@ export default class BetterTagBoxFeature extends Feature {
     }
 
     private async _commentary_changed(): Promise<void> {
-        const source_title = $("#post_artist_commentary_title").val() as string;
-        const source_description = $("#post_artist_commentary_desc").val() as string;
+        const source_title = $("#post_artist_commentary_original_title").val() as string;
+        const source_description = $("#post_artist_commentary_original_description").val() as string;
 
         /* Check for hashtag-only */
         let hashtag_only = true;
@@ -748,7 +748,7 @@ export default class BetterTagBoxFeature extends Feature {
                         this._commentary_changed();
                     }).observe($(".source-data")[0].parentElement, { childList: true });
             
-                    $("#post_artist_commentary_title,#post_artist_commentary_desc").on("change", _ => this._commentary_changed());
+                    $("#post_artist_commentary_original_title,#post_artist_commentary_original_description").on("change", _ => this._commentary_changed());
                 }
                 break;
             }
