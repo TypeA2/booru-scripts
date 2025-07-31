@@ -1,22 +1,21 @@
 {
-  "compilerOptions": {
-    "target": "esnext",
-    "module": "esnext",
-    "moduleResolution": "node",
-    "declaration": false,
-    "allowSyntheticDefaultImports": true,
-    "jsx": "preserve",
-    "jsxImportSource": "solid-js",
-    "skipLibCheck": true,
-    "lib": [
-      "DOM",
-      "ES6",
-      "DOM.Iterable",
-      "ScriptHost",
-      "ESNext"
+    "compilerOptions": {
+        "target": "esnext",
+        "module": "esnext",
+        "moduleResolution": "node",
+        "declaration": false,
+        "allowSyntheticDefaultImports": true,
+        "jsx": "preserve",
+        "skipLibCheck": true,
+        "lib": [
+            "DOM",
+            "ES6",
+            "DOM.Iterable",
+            "ScriptHost",
+            "ESNext"
+        ]
+    },
+    "include": [
+        "src/**/*"
     ]
-  },
-  "include": [
-    "src/**/*"
-  ]
 }

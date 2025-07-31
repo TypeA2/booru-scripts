@@ -2,13 +2,11 @@ import js from '@eslint/js';
 import prettier from 'eslint-config-prettier';
 import globals from 'globals';
 import ts from 'typescript-eslint';
-import solid from 'eslint-plugin-solid/configs/recommended';
 
 /** @type {import('eslint').Linter.Config[]} */
 export default [
 	js.configs.recommended,
 	...ts.configs.recommended,
-	solid,
 	prettier,
 	{
 		languageOptions: {

@@ -39,14 +39,13 @@ export default class OneUpFeature extends Feature {
     }
 
     private copy_tags(data: { post: HTMLElement, mode: "parent" | "another_child" | "child" }, e: MouseEvent): void {
+        console.log(data, e);
         e.preventDefault();
         
         if (data.mode === "another_child") {
             $("#post_tag_string").val($("#post_tag_string").val() + ` child:${data.post.dataset.id}`);
             $("#post_tag_string").trigger("input");
             
-            /* This isn't actually a component, eslint */
-            // eslint-disable-next-line solid/components-return-once
             return;
         }
 
@@ -120,13 +119,13 @@ export default class OneUpFeature extends Feature {
             const target = post.querySelector<HTMLElement>(":has(> div > .iqdb-similarity-score)");
 
             target.appendChild(<div>
-                Make: 
-                <a class="awoo-link" href="#" onClick={[this.copy_tags.bind(this), { post, mode: "parent" }]}>parent</a>
+                {"Make: "}
+                <a class="awoo-link" href="#" onclick={this.copy_tags.bind(this, { post, mode:"parent" })}>parent</a>
                 <span class="awoo-sep"> | </span>
-                <a class="awoo-link" href="#" onClick={[this.copy_tags.bind(this), { post, mode: "another_child"}]}>nth child</a>
+                <a class="awoo-link" href="#" onclick={this.copy_tags.bind(this, { post, mode: "another_child"})}>nth child</a>
                 <span class="awoo-sep"> | </span>
-                <a class="awoo-link" href="#" onClick={[this.copy_tags.bind(this), { post, mode: "child" }]}>child</a>
-            </div> as Node);
+                <a class="awoo-link" href="#" onclick={this.copy_tags.bind(this, { post, mode: "child" })}>child</a>
+            </div>);
         }
     }
 

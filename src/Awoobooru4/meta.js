@@ -7,12 +7,10 @@
 // @grant       GM_getValue
 // @grant       GM_setValue
 // @grant       GM_addStyle
-// @version     4.0.13
+// @version     4.1.0
 // @author      TypeA2
 // @description Various utilities to make life easier
 // @require     https://cdn.jsdelivr.net/npm/@violentmonkey/dom@2
-// @require     https://cdn.jsdelivr.net/npm/@violentmonkey/ui@0.7
-// @require     https://cdn.jsdelivr.net/npm/@violentmonkey/dom@2/dist/solid.min.js
 // @require     https://cdn.jsdelivr.net/npm/panzoom@9.4.3/dist/panzoom.min.js
 // @downloadURL https://github.com/TypeA2/booru-scripts/raw/refs/heads/master/dist/Awoobooru4.user.js
 // @updateURL   https://github.com/TypeA2/booru-scripts/raw/refs/heads/master/dist/Awoobooru4.user.js

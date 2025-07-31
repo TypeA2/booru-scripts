@@ -67,23 +67,15 @@ export default defineConfig(
             ...extra_plugins
         ],
         external: defineExternal([
-            '@violentmonkey/ui',
-            '@violentmonkey/dom',
-            'solid-js',
-            'solid-js/web',
+            "@violentmonkey/dom",
+            "alpinejs"
         ]),
         output: {
             format: 'iife',
             file: `dist/${name}.user.js`,
             globals: {
-                // Note:
-                // - VM.solid is just a third-party UMD bundle for solid-js since there is no official one
-                // - If you don't want to use it, just remove `solid-js` related packages from `external`, `globals` and the `meta.js` file.
-                'solid-js': 'VM.solid',
-                'solid-js/web': 'VM.solid.web',
-                'solid-js/store': 'VM.solid.store',
-                '@violentmonkey/dom': 'VM',
-                '@violentmonkey/ui': 'VM',
+                "@violentmonkey/dom": "VM",
+                "alpinejs": "Alpine"
             },
             indent: false,
             compact: is_production

@@ -1,13 +1,11 @@
-/* eslint-disable solid/jsx-no-script-url */
-import { For, createEffect, Show, createSignal, Accessor, Setter } from "solid-js";
 import Feature from "./Feature";
 import Options from "./Options";
-import { Dynamic, render } from "solid-js/web";
 import Logger from "./Logger";
 import { TagList } from "./TagList";
 import { MetaTag, NormalTag, NormalTagCategories, sanitize_tag_string, Tag } from "./Tag";
 import Autocorrect from "./Autocorrect";
 import { Page, PageManager } from "./PageManager";
+import Alpine from "alpinejs";
 
 const logger = new Logger("BetterTagBox");
 
@@ -24,7 +22,7 @@ const EDIT_ICON = () => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 51
                 88 88 88l272 0c48.6 0 88-39.4 88-88l0-112c0-13.3-10.7-24-24-24s-24
                 10.7-24 24l0 112c0 22.1-17.9 40-40 40L88 464c-22.1 0-40-17.9-40-40l0-272c0-22.1
                 17.9-40 40-40l112 0c13.3 0 24-10.7 24-24s-10.7-24-24-24L88 64z"/>
-    </svg> as SVGElement).cloneNode(true);
+    </svg> as Node as SVGElement).cloneNode(true);
 
 const DELETE_ICON = () => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512" class="icon svg-icon">
         {/* Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2025 Fonticons, Inc. */}
@@ -32,15 +30,9 @@ const DELETE_ICON = () => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 
                 210.7 86.6 105.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3L146.7
                 256 41.4 361.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L192 301.3
                 297.4 406.6c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L237.3 256 342.6 150.6z"/>
-    </svg> as SVGElement).cloneNode(true);
+    </svg> as Node as SVGElement).cloneNode(true);
 
-const CATEGORY_TO_ID = {
-    general: 0,
-    artist: 1,
-    copyright: 3,
-    character: 4,
-    meta: 5,
-} as const;
+
 
 function node_is_html(node: HTMLElement | Text): node is HTMLElement {
     return node.nodeType === Node.ELEMENT_NODE;
@@ -60,217 +52,320 @@ const MUTUALLY_EXCLUSIVE: (string | string[])[][] = [
     [ "solo", [ ...OTHER_CHARCOUNTERS.difference(new Set([ "1other" ]))] ],
 ];
 
-export default class BetterTagBoxFeature extends Feature {
-    public constructor() {
-        super("BetterTagBox");
+export class BetterTagBox {
+    private tag_list = Alpine.reactive(new TagList());
 
-        Options.register_feature("BetterTagBox", this);
+    private notice: string[] = Alpine.reactive([]);
+    private error_tags = Alpine.reactive(new Set<string>());
+
+    private _history: Tag[] = [];
+
+    private get tag_list_callbacks() {
+        const callback_builder = (category: string): [string, (t: Tag) => boolean] =>
+            [category, t => t instanceof NormalTag && !t.is_deprecated && t.category === category];
+
+        const callbacks: ([string, (t: Tag) => boolean])[] = [
+            ...NormalTagCategories.map(callback_builder),
+            ["metatags", t => t instanceof MetaTag],
+            ["deprecated", t => t instanceof NormalTag && t.is_deprecated],
+            ["unknown", t => t instanceof NormalTag && t.category === "unknown"],
+        ];
+
+        return callbacks;
     }
 
-    private tag_list: TagList;
-
-    private _error_tags: Accessor<Set<string>>;
-    private _set_error_tags: Setter<Set<string>>;
-
-    private get _tag_box_value() {
-        /* Normalized */
-        return ($("#awoo-tag-box").val() as string)
-            .toLowerCase()
-            .trim()
-            .replace(" ", "_");
+    private set tag_string(tags: string) {
+        this.tag_list.apply_tags(sanitize_tag_string(tags));
     }
 
-    private set _tag_box_value(val: string) {
+    private set tag_box(val: string) {
         $("#awoo-tag-box").val(val);
     }
 
-    private _notice: Accessor<string[]>;
-    private _set_notice: Setter<string[]>;
-    
-    private _can_submit(): boolean {
-        let ret = true;
-        const notice: string[] = [];
-        const error_tags = new Set<string>();
-
-        /// Has rating
-        if ($("input[name='post[rating]']:checked").length === 0) {
-            ret = false;
-            notice.push("No rating");
-        }
-        ///
-
-        /// Has tags at all
-        if (this.tag_list.length === 0) {
-            ret = false;
-            notice.push("No tags");
-        }
-        ///
-
-        /// Has deprecated, pending, unknown tags
-        const deprecated_tags: NormalTag[] = [];
-        const pending_tags: NormalTag[] = [];
-        const unknown_tags: NormalTag[] = [];
-        for (const tag of this.tag_list.tags.filter(t => t instanceof NormalTag)) {
-            if (tag.is_deprecated) {
-                deprecated_tags.push(tag);
-            } else if (tag.category === "unknown") {
-                if (tag.is_new) {
-                    unknown_tags.push(tag);
-                } else {
-                    pending_tags.push(tag);
-                }
-            }
-        }
-
-        ret &&= ((deprecated_tags.length === 0) && (pending_tags.length === 0) && (unknown_tags.length === 0));
-
-        if (deprecated_tags.length > 0) notice.push(`Deprecated: ${deprecated_tags.join(", ")}`);
-        // This would be annoying
-        // if (   pending_tags.length > 0) notice.push(`Pending: ${pending_tags.join(", ")}`);
-        if (   unknown_tags.length > 0) notice.push(`Unknown: ${unknown_tags.join(", ")}`);
-        ///
-        
-        /// No artist tag if required
-        if (this.tag_list.count_for_category("artist") === 0) {
-            if (!this.tag_list.contains("artist_request")
-                && !this.tag_list.contains("official_art")) {
-
-                notice.push("No artist");
-                ret = false;
-            }
-        }
-        ///
-
-        /// No copyright tags
-        if (this.tag_list.count_for_category("copyright") === 0 && !this.tag_list.contains("copyright_request")) {
-            notice.push("No copyright");
-            ret = false;
-        }
-        ///
-
-        /// No mutually exclusive tags
-        const tags = new Set(this.tag_list.tag_names);
-
-        let i = 0;
-        for (const group of MUTUALLY_EXCLUSIVE) {
-            ++i;
-
-            const matches: (string | string[])[] = [];
-
-            for (const item of group) {
-                if (typeof item === "string") {
-                    for (const tag of tags) {
-                        if (item === tag) {
-                            matches.push(tag);
-                            /* Tags are unique aslready */
-                            break;
-                        }
-                    }
-                } else {
-                    const submatches: string[] = [];
-                    for (const tag of tags) {
-                        if (item.includes(tag)) {
-                            submatches.push(tag);
-                        }
-                    }
-
-                    if (submatches.length > 0) {
-                        matches.push(submatches);
-                    }
-                }
-            }
-
-            if (matches.length > 1) {
-                const flat_matches = matches.flat();
-                
-                notice.push(`Conflicting tags: ${flat_matches.sort().join(", ")}`);
-
-                flat_matches.forEach(match => error_tags.add(match));
-            }
-        }
-    
-        ///
-
-        /// No charcounters
-        if (!tags.has("no_humans")
-            && [...tags].filter(t => GIRL_CHARCOUNTERS.has(t) || BOY_CHARCOUNTERS.has(t) || OTHER_CHARCOUNTERS.has(t)).length === 0) {
-            ret = false;
-            notice.push("No charcounters");
-        }
-        ///
-
-        /// No commentary tags despite being applicable
-        if (!tags.has("commentary") && !tags.has("commentary_request") && !tags.has("symbol-only_commentary")
-            && ($("#post_artist_commentary_original_title,#artist_commentary_original_title").val() || $("#post_artist_commentary_original_description,#artist_commentary_original_description").val())) {
-        
-            ret = false;
-
-            const commentary = ($("#post_artist_commentary_original_title,#artist_commentary_original_title").val() as string + $("#post_artist_commentary_original_description,#artist_commentary_original_description").val() as string).trim();
-            notice.push(`No commentary tags: "${commentary.slice(0, 10)}${commentary.length > 10 ? "..." : ""}"`);
-        }
-
-        if (($("#post_translated_commentary_title").val() || $("#post_translated_commentary_desc").val())
-            && !tags.has("commentary") && !tags.has("partial_commentary")) {
-            
-            ret = false;
-            notice.push("No (partial) commentary tag");
-        }
-        ///
-
-        /// Commentary despite there being none
-        // TODO: Handle specific *_commentary tags
-        if (!($("#post_artist_commentary_original_title,#artist_commentary_original_title").val() || $("#post_artist_commentary_original_description,#artist_commentary_original_description").val())
-            && (tags.has("commentary") || tags.has("commentary_request") || tags.has("partial_commentary"))) {
-            ret = false;
-
-            const which: string[] = [];
-
-            if (tags.has("commentary")) which.push("commentary");
-            if (tags.has("commentary_request")) which.push("commentary_request");
-            if (tags.has("partial_commentary")) which.push("partial_commentary");
-
-            notice.push(`Unneeded commentary tags: ${which.join(", ")}`);
-
-            which.forEach(t => error_tags.add(t));
-        }
-
-        this._set_notice(notice);
-        this._set_error_tags(error_tags);
-
-        return ret;
+    public get tag_box(): string {
+        return $("#awoo-tag-box").val().toString().toLocaleLowerCase().trim().replace(" ", "_");
     }
 
-    private _update_selected_tags() {
-        $(".related-tags li").each((_, el) => {
-            const li = $(el);
+    private _make_tag_box(): HTMLElement {
+        return <>
+            <input type="text" id="awoo-tag-box" x-on:keydown="tagbox._tag_box_keydown.bind(tagbox)" />
+            <span id="awoo-copy-controls">
+                <a href="javascript:void()"
+                    x-on:click="$event.preventDefault();
+                                await navigator.clipboard.writeText(tagbox.tag_list.tag_string);
+                                Danbooru.Utility.notice('Tags copied');
+                                $($event.target).blur();">
+                        Copy tags</a>
+                {" | "}
+                <a href="javascript:void()"
+                    x-on:click="$event.preventDefault();
+                                tagbox.tag_string = await navigator.clipboard.readText();
+                                Danbooru.Utility.notice('Tags pasted');
+                                $($event.target).blur();">Paste tags</a>
+            </span>
+            <template x-if="tagbox.notice.length > 0">
+                <div id="awoo-error-list" class="p-2 h-fit space-y-1 card">
+                    <ul>
+                        <template x-for="notice in tagbox.notice">
+                            <li class="awoo-tag-error" x-html="notice"></li>
+                        </template>
+                    </ul>
+                </div>
+            </template>
+            <div id="awoo-tag-list" class="p-2 h-fit space-y-1 card">
+                <ul>
+                    <template x-for="[what, cb] in tagbox.tag_list_callbacks">
+                        <span>
+                            <template x-for="tag in tagbox.tag_list.filter(cb).sort()" x-bind:data-what="what">
+                                <li class="awoo-tag"
+                                    x-bind:class="{ 'awoo-tag-error': tagbox.error_tags.has(tag.tag_string()), [tag.class_string()]: true,  }"
+                                    x-bind:data-tag-string="tag.tag_string()"
+                                    x-bind:data-tag-type="tag?.category || 'unknown'">
+                                    <template x-if="tag instanceof MetaTag && tag.key === 'rating'">
+                                        <span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
+                                    </template>
+                                    <template x-if="!(tag instanceof MetaTag && tag.key === 'rating')">
+                                        <span>
+                                            <a href="javascript:void()"
+                                                x-bind:title="'Remove &quot;' + tag.display_name() + '&quot;'"
+                                                x-on:click="$event.preventDefault(); tagbox.tag_list.remove_tag(tag);">
+                                                {DELETE_ICON()}
+                                            </a>
+                                            &nbsp;
+                                            <a href="javascript:void()"
+                                                x-bind:title="'Edit &quot;' + tag.display_name() + '&quot;'"
+                                                x-on:click="$event.preventDefault(); tagbox._edit_tag(tag);">
+                                                {EDIT_ICON()}
+                                            </a>
+                                            &nbsp;
+                                        </span>
+                                    </template>
 
-            const tag_name = li.find("a[data-tag-name]").data("tag-name");
+                                    <a target="_blank"
+                                        x-bind:class="{ ['tag-type-' + tag.category_id]: (tag instanceof NormalTag && tag.is_add && tag.category !== 'unknown') }"
+                                        x-bind:href="'/posts?tags=' + tag.search_string()"
+                                        x-text="tag.display_name()"></a>
+                                </li>
+                            </template>
+                        </span>
+                    </template>
+                </ul>
+            </div>
+        </>;
+    }
 
-            if (this.tag_list.has(t => t.unique_name() === tag_name)) {
-                logger.debug("Selecting", li.find("a[data-tag-name]"));
+    public constructor(el: HTMLElement) {
+        this.tag_list = new TagList();
 
-                li.addClass("selected").find("input").prop("checked", true);
-            } else {
-                li.removeClass("selected").find("input").prop("checked", false);
+        $("#post_tag_string").css("display", "none");
+
+        const _this = this;
+
+        logger.info("Initializing on", el);
+
+        $.widget("ui.autocomplete", $.ui.autocomplete, {
+            options: {
+                delay: 0,
+                minLength: 1,
+                autoFocus: false,
+                classes: { "ui-autocomplete": "absolute cursor-pointer max-w-480px max-h-480px text-sm border shadow-lg thin-scrollbar", },
+                focus: () => false,
+            },
+            _create: function () {
+                this.element.on("keydown.Autocomplete.tab", null, "tab", function (e: KeyboardEvent) {
+                    const input = $(this as HTMLInputElement);
+                    const instance = input.autocomplete("instance");
+                    const menu = (instance.menu as unknown as JQuery<HTMLElement> & { element: JQuery<HTMLElement>; }).element;
+
+                    _this.tag_box = "";
+                    
+                    /* Not actually doing autocomplete */
+                    if (!menu.is(":visible")) {
+                        logger.info("Autocomplete not visible");
+                        _this._try_add_tag(_this.tag_box);
+                        e.preventDefault();
+                        return;
+                    }
+
+                    /* Autocomplete is open but nothing in focus -> select first one */
+                    if (menu.has(".ui-state-active").length === 0) {
+                        const first = menu.find(".ui-menu-item").first();
+                        const value = first.data("autocomplete-value") as string;
+
+                        const sanitize = (s: string) => s
+                            .toLowerCase()
+                            .trim()
+                            .replaceAll(" ", "_");
+
+                        const original_query = sanitize(first.data("original-query") as string);
+                        //const current_query = sanitize($("#awoo-tag-box").val() as string);
+                        
+                        const is_negated = original_query[0] === "-";
+                        
+                        input.autocomplete("close");
+                        _this._try_add_tag((is_negated ? "-" : "") + value);
+                    }
+
+                    e.preventDefault();
+                });
+
+                this._super();
+            },
+            _renderItem: (list: JQuery<HTMLUListElement>, item: JQuery<HTMLLIElement>) => {
+                item.data("ui-autocomplete-item", item);
+                return list.append(item);
             }
         });
-    }
 
-    private _toggle_tag(e: Event): void {
-        e.preventDefault();
-        e.stopImmediatePropagation();
+        $(document).off("change.danbooru", ".related-tags input");
+        $(document).off("click.danbooru", ".related-tags .tag-list a");
 
-        const tag: string = $(e.target).closest("li").find("a").data("tag-name");
+        Danbooru.RelatedTag.update_selected = _ => this._update_selected_tags();
+        Danbooru.RelatedTag.toggle_tag = e => this._toggle_tag(e);
 
-        logger.info("Toggling", tag);
+        /* Just intercept all related tags clicks, this results in more consistent behavior */
+        $("#related-tags-container").on("click", "a[data-tag-name]", e => this._toggle_tag(e as unknown as Event));
+        
 
-        if (this.tag_list.contains(tag)) {
-            this.tag_list.remove_tag(tag);
-        } else {
-            this.tag_list.apply_tag(tag);
+        const initial_tags = sanitize_tag_string($("#post_tag_string").val() as string || "");
+        const initial_parent = $("#post_parent_id").val();
+        if (initial_parent) {
+            initial_tags.push(`parent:${initial_parent}`);
         }
 
-        this._update_selected_tags();
+        const initial_rating = $("#form input[name='post[rating]']:checked").val();
+        if (initial_rating) {
+            initial_tags.push(`rating:${initial_rating}`);
+        }
+
+        /* Make the source's arttag always an arttag, even if it doesnt exist yet */
+        this.tag_string = initial_tags.map(tag => {
+            if (tag === $(".source-data-content a.tag-type-1").text()) {
+                return `artist:${tag}`;
+            }
+
+            return tag;
+        }).join(" ");
+
+
+        Alpine.effect(() => {
+            this._tag_list_updated();
+        });
+
+        $("#post_tag_string").parent()
+            .append(this._make_tag_box())
+            .addClass("flex flex-col gap-2");
+
+        /* Re-implement autocomplete to have more control */
+        $("#awoo-tag-box").autocomplete({
+            select: (_, ui) => {
+                const el = ui.item as JQuery<HTMLLIElement>;
+
+                $("#awoo-tag-box").val((el.data("is-negated") ? "-" : "") + el.data("autocomplete-value"));
+                this._try_add_tag(this.tag_box);
+            },
+            source: async (req: { term: string; }, res: (data: JQuery<HTMLLIElement>[]) => void) => {
+                res(await this._autocomplete_source(req.term));
+            },
+        });
+
+        try {
+            $("#post_tag_string")
+                .removeAttr("data-autocomplete")
+                .off("selectionchange")
+                .autocomplete("destroy");
+        } catch {
+            /* May throw since autocomplete may not be initialized yet, just ignore */
+        }
+
+        $("#post_tag_string").data("uiAutocomplete", { close: () => {} });
+
+        $("label[for='post_tag_string']").attr("for", "awoo-tag-box");
+
+        $(".post_tag_string .hint").css("display", "none");
+
+        $("#post_parent_id").on("input", e => {
+            this._try_add_tag(`parent:${$(e.target).val()}`);
+            this._tag_list_updated();
+        });
+
+        $("#form input[name='post[rating]']").on("click", e => {
+            this._try_add_tag(`rating:${$(e.target).val()}`);
+        });
+
+        $("#post_tag_string").on("input.danbooru", e => {
+            /* Replace tags by a different value */
+            //this.tag_list.clear();
+            this.tag_string = $(e.target).val() as string;
+        });
+
+        $("#form input[type='submit']").after(<div class="input inline-input inline-toggle-switch boolean !m-0" id="awoo-override-check-container">
+            <input class="boolean optional toggle-switch" type="checkbox" id="awoo-override-check" x-on:change="tagbox._tag_list_updated()"/>
+            <label class="boolean optional" for="awoo-override-check">Skip check</label>
+        </div>);
+
+        $(document).one("danbooru:show-related-tags", _ => this._update_selected_tags());
+
+        switch (PageManager.current_page()) {
+            case Page.UploadSingle: {
+                $("#awoo-tag-box").focus();
+
+                /* Non-web sources don't have source data */
+                if ($(".source-data").length > 0) {
+                    new MutationObserver(_ => {
+                        this._commentary_changed();
+                    }).observe($(".source-data")[0].parentElement, { childList: true });
+            
+                    $("#post_artist_commentary_original_title,#post_artist_commentary_original_description").on("change", _ => this._commentary_changed());
+                }
+                break;
+            }
+
+            case Page.ViewPost: {
+                new MutationObserver(_ => {
+                    if ($("#edit").is(":visible")) {
+                        $("#awoo-tag-box").focus();
+                    }
+                }).observe($("#edit")[0], { attributes: true, attributeFilter: [ "style" ] });
+                break;
+            }
+        }
+    }
+
+    private _try_add_tag(tag: string) {
+        if (!tag) {
+            return;
+        }
+
+        const is_add = tag[0] !== "-";
+
+        /* Don't autocorrect tag removals, this gets in the way of removing typos  */
+        if (is_add) {
+            [tag, ] = Autocorrect.correct_tag(tag);
+        }
+
+        // const parsed = TagRegistry.parse_tag(is_negated ? tag.slice(1) : tag);
+        const parsed = Tag.parse_tag(tag);
+
+        logger.info("Adding", tag, parsed);
+
+        if (!parsed) {
+            /* Can't parse it, what to do? */
+            $("#awoo-tag-box").parent().addClass("field_with_errors");
+            $("#awoo-tag-box").one("input", e => e.target.parentElement.classList.remove("field_with_errors"));
+            return;
+        }
+        
+        $("#awoo-tag-box").parent().removeClass("field_with_errors");
+
+        this.tag_list.apply_tag(parsed);
+
+        /* Only store tag addition in history */
+        if (parsed.is_add && !(parsed instanceof MetaTag && parsed.key === "rating")) {
+            this._history.push(parsed);
+
+            this._tag_list_updated();
+        }
     }
 
     private _tag_list_updated() {
@@ -314,11 +409,209 @@ export default class BetterTagBoxFeature extends Feature {
         }
     }
 
+    private _edit_tag(tag: Tag) {
+        this.tag_list.remove_tag(tag);
+
+        const value = tag.display_name();
+
+        const tag_box: JQuery<HTMLInputElement> = $("#awoo-tag-box");
+        tag_box.val(value);
+        tag_box.select();
+        tag_box[0].setSelectionRange(value.length, value.length);
+        tag_box.autocomplete("search", value);
+    }
+
+    private _update_selected_tags() {
+        $(".related-tags li").each((_, el) => {
+            const li = $(el);
+
+            const tag_name = li.find("a[data-tag-name]").data("tag-name");
+
+            if (this.tag_list.has(t => t.unique_name() === tag_name)) {
+                logger.debug("Selecting", li.find("a[data-tag-name]"));
+
+                li.addClass("selected").find("input").prop("checked", true);
+            } else {
+                li.removeClass("selected").find("input").prop("checked", false);
+            }
+        });
+    }
+
+    private _toggle_tag(e: Event): void {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+
+        const tag: string = $(e.target).closest("li").find("a").data("tag-name");
+
+        logger.info("Toggling", tag);
+
+        if (this.tag_list.contains(tag)) {
+            this.tag_list.remove_tag(tag);
+        } else {
+            this.tag_list.apply_tag(tag);
+        }
+
+        this._update_selected_tags();
+    }
+
+    private _can_submit(): boolean {
+        let ret = true;
+        
+        /* This is allowed apparently */
+        this.notice.length = 0;
+
+        this.error_tags.clear();
+
+        /// Has rating
+        if ($("input[name='post[rating]']:checked").length === 0) {
+            ret = false;
+            this.notice.push("No rating");
+        }
+        ///
+
+        /// Has tags at all
+        if (this.tag_list.length === 0) {
+            ret = false;
+            this.notice.push("No tags");
+        }
+        ///
+
+        /// Has deprecated, pending, unknown tags
+        const deprecated_tags: NormalTag[] = [];
+        const pending_tags: NormalTag[] = [];
+        const unknown_tags: NormalTag[] = [];
+        for (const tag of this.tag_list.tags.filter(t => t instanceof NormalTag)) {
+            if (tag.is_deprecated) {
+                deprecated_tags.push(tag);
+            } else if (tag.category === "unknown") {
+                if (tag.is_new) {
+                    unknown_tags.push(tag);
+                } else {
+                    pending_tags.push(tag);
+                }
+            }
+        }
+
+        ret &&= ((deprecated_tags.length === 0) && (pending_tags.length === 0) && (unknown_tags.length === 0));
+
+        if (deprecated_tags.length > 0) this.notice.push(`Deprecated: ${deprecated_tags.join(", ")}`);
+        // This would be annoying
+        // if (   pending_tags.length > 0) notice.push(`Pending: ${pending_tags.join(", ")}`);
+        if (   unknown_tags.length > 0) this.notice.push(`Unknown: ${unknown_tags.join(", ")}`);
+        ///
+        
+        /// No artist tag if required
+        if (this.tag_list.count_for_category("artist") === 0) {
+            if (!this.tag_list.contains("artist_request")
+                && !this.tag_list.contains("official_art")) {
+
+                this.notice.push("No artist");
+                ret = false;
+            }
+        }
+        ///
+
+        /// No copyright tags
+        if (this.tag_list.count_for_category("copyright") === 0 && !this.tag_list.contains("copyright_request")) {
+            this.notice.push("No copyright");
+            ret = false;
+        }
+        ///
+
+        /// No mutually exclusive tags
+        const tags = new Set(this.tag_list.tag_names);
+
+        let i = 0;
+        for (const group of MUTUALLY_EXCLUSIVE) {
+            ++i;
+
+            const matches: (string | string[])[] = [];
+
+            for (const item of group) {
+                if (typeof item === "string") {
+                    for (const tag of tags) {
+                        if (item === tag) {
+                            matches.push(tag);
+                            /* Tags are unique already */
+                            break;
+                        }
+                    }
+                } else {
+                    const submatches: string[] = [];
+                    for (const tag of tags) {
+                        if (item.includes(tag)) {
+                            submatches.push(tag);
+                        }
+                    }
+
+                    if (submatches.length > 0) {
+                        matches.push(submatches);
+                    }
+                }
+            }
+
+            if (matches.length > 1) {
+                const flat_matches = matches.flat();
+                
+                this.notice.push(`Conflicting tags: ${flat_matches.sort().join(", ")}`);
+
+                flat_matches.forEach(match => this.error_tags.add(match));
+            }
+        }
+    
+        ///
+
+        /// No charcounters
+        if (!tags.has("no_humans")
+            && [...tags].filter(t => GIRL_CHARCOUNTERS.has(t) || BOY_CHARCOUNTERS.has(t) || OTHER_CHARCOUNTERS.has(t)).length === 0) {
+            ret = false;
+            this.notice.push("No charcounters");
+        }
+        ///
+
+        /// No commentary tags despite being applicable
+        if (!tags.has("commentary") && !tags.has("commentary_request") && !tags.has("symbol-only_commentary")
+            && ($("#post_artist_commentary_original_title,#artist_commentary_original_title").val() || $("#post_artist_commentary_original_description,#artist_commentary_original_description").val())) {
+        
+            ret = false;
+
+            const commentary = ($("#post_artist_commentary_original_title,#artist_commentary_original_title").val() as string + $("#post_artist_commentary_original_description,#artist_commentary_original_description").val() as string).trim();
+            this.notice.push(`No commentary tags: "${commentary.slice(0, 10)}${commentary.length > 10 ? "..." : ""}"`);
+        }
+
+        if (($("#post_translated_commentary_title").val() || $("#post_translated_commentary_desc").val())
+            && !tags.has("commentary") && !tags.has("partial_commentary")) {
+            
+            ret = false;
+            this.notice.push("No (partial) commentary tag");
+        }
+        ///
+
+        /// Commentary despite there being none
+        // TODO: Handle specific *_commentary tags
+        if (!($("#post_artist_commentary_original_title,#artist_commentary_original_title").val() || $("#post_artist_commentary_original_description,#artist_commentary_original_description").val())
+            && (tags.has("commentary") || tags.has("commentary_request") || tags.has("partial_commentary"))) {
+            ret = false;
+
+            const which: string[] = [];
+
+            if (tags.has("commentary")) which.push("commentary");
+            if (tags.has("commentary_request")) which.push("commentary_request");
+            if (tags.has("partial_commentary")) which.push("partial_commentary");
+
+            this.notice.push(`Unneeded commentary tags: ${which.join(", ")}`);
+
+            which.forEach(t => this.error_tags.add(t));
+        }
+
+        return ret;
+    }
+
     private _tag_box_keydown(e: KeyboardEvent) {
         switch (e.key) {
             case "Enter":
-                this._try_add_tag(this._tag_box_value);
-                this._tag_list_updated();
+                this._try_add_tag(this.tag_box);
+                this.tag_box = "";
 
                 if (e.ctrlKey) {
                     e.preventDefault();
@@ -336,86 +629,20 @@ export default class BetterTagBoxFeature extends Feature {
             case " ":
                 e.preventDefault();
 
-                this._try_add_tag(this._tag_box_value);
+                $("#awoo-tag-box").autocomplete("close");
+
+                this._try_add_tag(this.tag_box);
+                this.tag_box = "";
                 break;
 
             case "ArrowLeft":
             case "Backspace":
-                if (!this._tag_box_value && (e.target as HTMLInputElement).selectionStart === 0) {
+                if (!this.tag_box && (e.target as HTMLInputElement).selectionStart === 0) {
                     e.preventDefault();
                     this._try_undo(e.key === "Backspace");
                 }
                 break;
         }
-    }
-
-    private _history: Tag[] = [];
-
-    private _try_undo(select: boolean) {
-        if (this._history.length === 0) {
-            return;
-        }
-
-        const last = this._history.pop();
-
-        this.tag_list.remove_tag(last);
-        $("#awoo-tag-box").val(last.display_name());
-
-        if (select) {
-            $("#awoo-tag-box").select();
-        }
-    }
-
-    private _try_add_tag(tag: string) {
-        if (!tag) {
-            return;
-        }
-
-        const is_add = tag[0] !== "-";
-
-        /* Don't autocorrect tag removals, this gets in the way of removing typos  */
-        if (is_add) {
-            [tag, ] = Autocorrect.correct_tag(tag);
-        }
-
-        // const parsed = TagRegistry.parse_tag(is_negated ? tag.slice(1) : tag);
-        const parsed = Tag.parse_tag(tag);
-
-        logger.info("Adding", tag, parsed);
-
-        if (!parsed) {
-            /* Can't parse it, what to do? */
-            $("#awoo-tag-box").parent().addClass("field_with_errors");
-            $("#awoo-tag-box").one("input", e => e.target.parentElement.classList.remove("field_with_errors"));
-            return;
-        }
-        
-        $("#awoo-tag-box").parent().removeClass("field_with_errors");
-
-        this.tag_list.apply_tag(parsed);
-
-        /* Only store tag addition in history */
-        this._history.push(parsed);
-
-        this._tag_box_value = "";
-    }
-
-    private _set_tag_string(tags: string) {
-        // this.tag_list.clear();
-
-        this.tag_list.apply_tags(sanitize_tag_string(tags).map(Tag.parse_tag));
-    }
-
-    private _edit_tag(tag: Tag) {
-        this.tag_list.remove_tag(tag);
-
-        const value = tag.display_name();
-
-        const tag_box: JQuery<HTMLInputElement> = $("#awoo-tag-box");
-        tag_box.val(value);
-        tag_box.select();
-        tag_box[0].setSelectionRange(value.length, value.length);
-        tag_box.autocomplete("search", value);
     }
 
     private async _commentary_changed(): Promise<void> {
@@ -482,87 +709,19 @@ export default class BetterTagBoxFeature extends Feature {
         this._tag_list_updated();
     }
 
-    private make_tag_box() {
-        const callback_builder = (category: string): (t: Tag) => boolean =>
-            t => t instanceof NormalTag && !t.is_deprecated && t.category === category;
+    private _try_undo(select: boolean) {
+        if (this._history.length === 0) {
+            return;
+        }
 
-        // TODO: Put negated tags at the bottom
-        const callbacks: ((t: Tag) => boolean)[] = [
-            ...NormalTagCategories.map(callback_builder),
-            t => t instanceof MetaTag,
-            t => t instanceof NormalTag && t.is_deprecated,
-            t => t instanceof NormalTag && t.category === "unknown",
-        ];
+        const last = this._history.pop();
 
-        return <>
-            <input type="text" id="awoo-tag-box" onKeyDown={e => { this._tag_box_keydown(e);} } />
-            <span id="awoo-copy-controls">
-                <a href="javascript:void()" onClick={async e => {
-                    e.preventDefault();
-                    await navigator.clipboard.writeText(this.tag_list.tag_string);
-                    Danbooru.Utility.notice("Tags copied");
-                    $(e.target).blur();
-                }}>Copy tags</a>
-                &nbsp;-&nbsp;
-                <a href="javascript:void()" onClick={async e => {
-                    e.preventDefault();
-                    this._set_tag_string(await navigator.clipboard.readText());
-                    Danbooru.Utility.notice("Tags pasted");
-                    $(e.target).blur();
-                }}>Paste tags</a>
-            </span>
-            <hr/>
-            <Show when={this._notice().length > 0}>
-                <div id="awoo-error-list" class="p-2 h-fit space-y-t card">
-                    <ul>
-                    <For each={this._notice()}>
-                        {msg => <li class="awoo-tag-error">{msg}</li>}
-                    </For>
-                    </ul>
-                </div>
-                <hr/>
-            </Show>
-            <div id="awoo-tag-list" class="p-2 h-fit space-y-1 card">
-                <ul>
-                <For each={callbacks}>
-                {cb =>
-                    <For each={this.tag_list.filter(cb).sort()}>
-                    {tag => {
-                        return <Dynamic
-                            component="li"
-                            class={`awoo-tag ${tag.class_string()}${this._error_tags().has(tag.tag_string()) ? " awoo-tag-error" : ""}`}
-                            data-tag-string={tag.tag_string()}
-                            >
-                            {/* 7x nbsp seems to work lol */}
-                            <Show when={!(tag instanceof MetaTag && tag.key === "rating")} fallback="&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;">
-                                <a href="#" title={`Remove "${tag.display_name()}"`} on:click={e => {
-                                    e.preventDefault();
-                                    this.tag_list.remove_tag(tag);
-                                }}>{DELETE_ICON()}</a>
-                                &nbsp;
-                                <a href="#" title={`Edit "${tag.display_name()}"`} on:click={e => {
-                                    e.preventDefault();
-                                    this._edit_tag(tag);
-                                }}>{EDIT_ICON()}</a>
-                                &nbsp;
-                            </Show>
+        this.tag_list.remove_tag(last);
+        $("#awoo-tag-box").val(last.display_name());
 
-                            <Show when={tag instanceof NormalTag && tag.is_add && tag.category !== "unknown"}
-                                fallback={<a href={`/posts?tags=${tag.search_string()}`} target="_blank">{tag.display_name()}</a>}>
-                                <a href={`/posts?tags=${tag.search_string()}`}
-                                    target="_blank"
-                                    class={`tag-type-${CATEGORY_TO_ID[(tag as NormalTag).category]}`}>
-                                    {tag.display_name()}
-                                </a>
-                            </Show>
-                        </Dynamic>;
-                    }}
-                    </For>
-                    }
-                </For>
-                </ul>
-            </div>
-        </>;
+        if (select) {
+            $("#awoo-tag-box").select();
+        }
     }
 
     private async _autocomplete_source(query: string): Promise<JQuery<HTMLLIElement>[]> {
@@ -585,183 +744,21 @@ export default class BetterTagBoxFeature extends Feature {
         items.forEach(e => e.data("original-query", query).data("is-negated", is_negated));
         return items;
     }
+}
+
+unsafeWindow["BetterTagBox"] = BetterTagBox;
+
+export default class BetterTagBoxFeature extends Feature {
+    public constructor() {
+        super("BetterTagBox");
+
+        Options.register_feature("BetterTagBox", this);
+    }
 
     public enable() {
         logger.info("Enabling");
 
-        const _this = this;
-
-        $.widget("ui.autocomplete", $.ui.autocomplete, {
-            options: {
-                delay: 0,
-                minLength: 1,
-                autoFocus: false,
-                classes: { "ui-autocomplete": "absolute cursor-pointer max-w-480px max-h-480px text-sm border shadow-lg thin-scrollbar", },
-                focus: () => false,
-            },
-            _create: function () {
-                this.element.on("keydown.Autocomplete.tab", null, "tab", function (e: KeyboardEvent) {
-                    const input = $(this as HTMLInputElement);
-                    const instance = input.autocomplete("instance");
-                    const menu = (instance.menu as unknown as JQuery<HTMLElement> & { element: JQuery<HTMLElement>; }).element;
-                    
-                    /* Not actually doing autocomplete */
-                    if (!menu.is(":visible")) {
-                        logger.info("Autocomplete not visible");
-                        _this._try_add_tag(_this._tag_box_value);
-                        e.preventDefault();
-                        return;
-                    }
-
-                    /* Autocomplete is open but nothing in focus -> select first one */
-                    if (menu.has(".ui-state-active").length === 0) {
-                        const first = menu.find(".ui-menu-item").first();
-                        const value = first.data("autocomplete-value") as string;
-
-                        const sanitize = (s: string) => s
-                            .toLowerCase()
-                            .trim()
-                            .replaceAll(" ", "_");
-
-                        const original_query = sanitize(first.data("original-query") as string);
-                        //const current_query = sanitize($("#awoo-tag-box").val() as string);
-                        
-                        const is_negated = original_query[0] === "-";
-                        
-                        input.autocomplete("close");
-                        _this._try_add_tag((is_negated ? "-" : "") + value);
-                    }
-
-                    e.preventDefault();
-                });
-
-                this._super();
-            },
-            _renderItem: (list: JQuery<HTMLUListElement>, item: JQuery<HTMLLIElement>) => {
-                item.data("ui-autocomplete-item", item);
-                return list.append(item);
-            }
-        });
-
-
-        $(document).off("change.danbooru", ".related-tags input");
-        $(document).off("click.danbooru", ".related-tags .tag-list a");
-
-        Danbooru.RelatedTag.update_selected = _ => this._update_selected_tags();
-        Danbooru.RelatedTag.toggle_tag = e => this._toggle_tag(e);
-
-        /* Just intercept all related tags clicks, this results in more consistent behavior */
-        $("#related-tags-container").on("click", "a[data-tag-name]", e => this._toggle_tag(e as unknown as Event));
-
-        const initial_tags = sanitize_tag_string($("#post_tag_string").val() as string || "");
-        const initial_parent = $("#post_parent_id").val();
-        if (initial_parent) {
-            initial_tags.push(`parent:${initial_parent}`);
-        }
-
-        const initial_rating = $("#form input[name='post[rating]']:checked").val();
-        if (initial_rating) {
-            initial_tags.push(`rating:${initial_rating}`);
-        }
-
-        this.tag_list = new TagList();
-
-        // eslint-disable-next-line solid/reactivity
-        [this._error_tags, this._set_error_tags] = createSignal(new Set<string>());
-
-        // eslint-disable-next-line solid/reactivity
-        [this._notice, this._set_notice] = createSignal([] as string[]);
-
-        createEffect(() => this._tag_list_updated());
-
-        this._set_tag_string(initial_tags.map(tag => {
-            if (tag === $(".source-data-content a.tag-type-1").text()) {
-                return `artist:${tag}`;
-            }
-
-            return tag;
-        }).join(" "));
-
-        render(
-            () => this.make_tag_box.bind(this),
-            document.getElementById("post_tag_string").parentElement
-        );
-
-        /* Re-implement autocomplete to have more control */
-        $("#awoo-tag-box").autocomplete({
-            select: (_, ui) => {
-                const el = ui.item as JQuery<HTMLLIElement>;
-
-                $("#awoo-tag-box").val((el.data("is-negated") ? "-" : "") + el.data("autocomplete-value"));
-                this._try_add_tag(this._tag_box_value);
-            },
-            source: async (req: { term: string; }, res: (data: JQuery<HTMLLIElement>[]) => void) => {
-                res(await this._autocomplete_source(req.term));
-            },
-        });
-
-        try {
-            $("#post_tag_string")
-                .removeAttr("data-autocomplete")
-                .css("display", "none")
-                .autocomplete("destroy");
-        } catch {
-            /* May throw since autocomplete may not be initialized yet, just ignore */
-        }
-
-        $("#post_tag_string").data("uiAutocomplete", { close: () => {} });
-
-        $("label[for='post_tag_string']").attr("for", "awoo-tag-box");
-
-        $(".post_tag_string .hint").css("display", "none");
-
-        $("#post_parent_id").on("input", e => {
-            this._try_add_tag(`parent:${$(e.target).val()}`);
-            this._tag_list_updated();
-        });
-
-        $("#form input[name='post[rating]']").on("click", e => {
-            this._try_add_tag(`rating:${$(e.target).val()}`);
-            this._tag_list_updated();
-        });
-
-        $("#post_tag_string").on("input.danbooru", e => {
-            /* Replace tags by a different value */
-            //this.tag_list.clear();
-            this._set_tag_string($(e.target).val() as string);
-        });
-
-        $("#form input[type='submit']").after(<div class="input boolean optional inline-block" id="awoo-override-check-container">
-            <input class="boolean optional" type="checkbox" id="awoo-override-check" on:change={_ => this._tag_list_updated()}/>
-            <label class="boolean optional" for="awoo-override-check">Skip check</label>
-        </div> as HTMLElement);
-
-        $(document).one("danbooru:show-related-tags", _ => this._update_selected_tags());
-
-        switch (PageManager.current_page()) {
-            case Page.UploadSingle: {
-                $("#awoo-tag-box").focus();
-
-                /* Non-web sources don't have source data */
-                if ($(".source-data").length > 0) {
-                    new MutationObserver(_ => {
-                        this._commentary_changed();
-                    }).observe($(".source-data")[0].parentElement, { childList: true });
-            
-                    $("#post_artist_commentary_original_title,#post_artist_commentary_original_description").on("change", _ => this._commentary_changed());
-                }
-                break;
-            }
-
-            case Page.ViewPost: {
-                new MutationObserver(_ => {
-                    if ($("#edit").is(":visible")) {
-                        $("#awoo-tag-box").focus();
-                    }
-                }).observe($("#edit")[0], { attributes: true, attributeFilter: [ "style" ] });
-                break;
-            }
-        }
+        $(".upload-edit-container, #edit").attr("x-data", "{ tagbox: new BetterTagBox($el) }");
     }
 
     public disable() {

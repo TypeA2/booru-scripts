@@ -59,9 +59,9 @@ export default class UITweaks extends Feature {
         const get_count = (hdr: "favorite" | "note-update" | "post-update" | "post-upload"): number =>
             $(document.body).data(`user-${hdr}-count`);
 
-        get_row("Uploads").append(`(${((get_count("post-upload") / get_count("post-update") * 100) || 0).toFixed(2)}% of post changes)`);
+        get_row("Posts").append(`(${((get_count("post-upload") / get_count("post-update") * 100) || 0).toFixed(2)}% of post changes)`);
 
-        const deleted = get_row("Deleted Uploads");
+        const deleted = get_row("Deleted Posts");
         deleted.append(`(${((+deleted.find("a").text() / get_count("post-upload") * 100) || 0).toFixed(2)}% of uploads)`);
     }
 
@@ -69,7 +69,7 @@ export default class UITweaks extends Feature {
         const views = await $.get(`https://isshiki.donmai.us/post_views/${$(document.body).data("post-id")}`);
         $("#post-info-favorites").after(<li id="post-info-views">
             {`Views: ${views}`}
-        </li> as HTMLElement);
+        </li>);
     }
 
     private async _recent_tags(): Promise<void> {
@@ -112,7 +112,7 @@ export default class UITweaks extends Feature {
             container.prepend(<>
                 <a id="view-wiki-link" href={`/wiki_pages/new?wiki_page[title]=${artist_name}`} target="_blank">Create wiki</a>
                 <span> | </span>
-            </> as HTMLElement);
+            </>);
         }
     }
 

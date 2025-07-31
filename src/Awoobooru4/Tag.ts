@@ -50,6 +50,14 @@ export const CATEGORY_TO_NAME = {
     "5": "meta"
 } as const;
 
+export const CATEGORY_TO_ID = {
+    general: 0,
+    artist: 1,
+    copyright: 3,
+    character: 4,
+    meta: 5,
+} as const;
+
 export const GIRL_COUNTERS = [ "1girl", "2girls", "3girls", "4girls", "5girls", "6+girls" ] as const;
 export const BOY_COUNTERS = [ "1boy", "2boys", "3boys", "4boys", "5boys", "6+boys" ] as const;
 export const OTHER_COUNTERS = [ "1other", "2others", "3others", "4others", "5others", "6+others" ] as const;
@@ -192,6 +200,10 @@ export class NormalTag extends Tag {
         return this._tag_category;
     }
 
+    public get category_id(): number{
+        return CATEGORY_TO_ID[this._tag_category];
+    }
+
     public get is_deprecated(): boolean {
         return this._is_deprecated;
     }
@@ -277,3 +289,6 @@ export class MetaTag extends Tag {
         return "awoo-tag-meta-tag";
     }
 }
+
+unsafeWindow["NormalTag"] = NormalTag;
+unsafeWindow["MetaTag"] = MetaTag;

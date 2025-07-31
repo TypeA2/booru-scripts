@@ -1,7 +1,6 @@
-import { createStore } from "solid-js/store";
 import { ApiTag, CATEGORY_TO_NAME, MetaTag, NormalTag, NormalTagCategory, Tag } from "./Tag";
 import Logger from "./Logger";
-import { batch } from "solid-js";
+import Alpine from "alpinejs";
 
 const logger = new Logger("TagList");
 
@@ -11,12 +10,12 @@ interface PendingState { [name: string]: NormalTag };
 const RESOLVE_DELAY = 500 as const;
 
 export class TagList {
-    public constructor() {
-        this._state = createStore<TagListState>({});
-        this._pending = createStore<PendingState>({});
+    private _state: TagListState = Alpine.reactive({});
+    private _pending: PendingState = Alpine.reactive({});
 
+    public constructor() {
         setInterval(async () => {
-            const tags = Object.values(this._pending[0]);
+            const tags = Object.values(this._pending);
 
             if (tags.length === 0) {
                 return;
@@ -49,9 +48,6 @@ export class TagList {
 
         }, RESOLVE_DELAY);
     }
-
-    private _state: ReturnType<typeof createStore<TagListState>>;
-    private _pending: ReturnType<typeof createStore<PendingState>>;
 
     public apply_tag(tag: string | Tag) {
         tag = Tag.parse_tag(tag);
@@ -87,9 +83,7 @@ export class TagList {
     }
 
     public apply_tags(tags: (string | Tag)[]) {
-        batch(() => {
-            tags.map(t => this.apply_tag(t));
-        });
+        tags.map(t => this.apply_tag(t));
     }
 
     public remove_tag(tag: string | Tag) {
@@ -100,26 +94,24 @@ export class TagList {
     }
 
     public remove_tags(tags: (string | Tag)[]) {
-        batch(() => {
-            tags.map(t => this.remove_tag(t));
-        });
+        tags.map(t => this.remove_tag(t));
     }
 
-    private _has_tag(tag: Tag) { return Object.prototype.hasOwnProperty.call(this._state[0], tag.unique_name()); }
-    private _has_pending(tag: Tag) { return Object.prototype.hasOwnProperty.call(this._pending[0], tag.unique_name()); }
-    private _store_tag(tag: Tag) { this._state[1](tag.unique_name(), tag); }
-    private _store_pending(tag: Tag) { this._pending[1](tag.unique_name(), tag); }
-    private _remove_tag(tag: Tag) { this._state[1](tag.unique_name(), undefined); }
-    private _remove_pending(tag: Tag) { this._pending[1](tag.unique_name(), undefined); }
+    private _has_tag(tag: Tag) { return Object.prototype.hasOwnProperty.call(this._state, tag.unique_name()); }
+    private _has_pending(tag: Tag) { return Object.prototype.hasOwnProperty.call(this._pending, tag.unique_name()); }
+    private _store_tag(tag: Tag) { this._state[tag.unique_name()] = tag; }
+    private _store_pending(tag: Tag) { this._pending[tag.unique_name()] = tag as NormalTag; }
+    private _remove_tag(tag: Tag) { delete this._state[tag.unique_name()]; }
+    private _remove_pending(tag: Tag) { delete this._pending[tag.unique_name()]; }
 
     public get length() {
-        return Object.keys(this._state[0]).length + Object.keys(this._pending[0]).length;
+        return Object.keys(this._state).length + Object.keys(this._pending).length;
     }
 
     public get tags(): Tag[] {
         return [
-            ...Object.values(this._state[0]),
-            ...Object.values(this._pending[0]),
+            ...Object.values(this._state),
+            ...Object.values(this._pending),
         ];
     }
 
@@ -152,7 +144,7 @@ export class TagList {
     }
 
     public get(tag: string): Tag {
-        return this._state[0][tag] || this._pending[0][tag];
+        return this._state[tag] || this._pending[tag];
     }
 
     public count_for_category(category: NormalTagCategory): number {
@@ -203,6 +195,8 @@ export class TagList {
             dataType: "json",
             data: request_data
         }) as ApiTag[];
+
+        // TODO: ensure tags are still in the list before adding them back
 
         const add_map: { [name: string]: boolean } = {};
         tags.forEach(tag => add_map[tag.unique_name()] = tag.is_add);

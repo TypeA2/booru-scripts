@@ -3,12 +3,10 @@
 // @namespace   https://github.com/TypeA2/booru-scripts
 // @match       *://*.donmai.us/*
 // @match       *://cos.lycore.co/*
-// @version     4.0.13
+// @version     4.1.0
 // @author      TypeA2
 // @description Various utilities to make life easier
 // @require     https://cdn.jsdelivr.net/npm/@violentmonkey/dom@2
-// @require     https://cdn.jsdelivr.net/npm/@violentmonkey/ui@0.7
-// @require     https://cdn.jsdelivr.net/npm/@violentmonkey/dom@2/dist/solid.min.js
 // @require     https://cdn.jsdelivr.net/npm/panzoom@9.4.3/dist/panzoom.min.js
 // @downloadURL https://github.com/TypeA2/booru-scripts/raw/refs/heads/master/dist/Awoobooru4.user.js
 // @updateURL   https://github.com/TypeA2/booru-scripts/raw/refs/heads/master/dist/Awoobooru4.user.js
@@ -19,7 +17,26 @@
 // @grant       GM_setValue
 // ==/UserScript==
 
-(function(web,solidJs,store){'use strict';var css_248z$2 = "#awoo-tag-list{max-width:100%}.awoo-tag{margin:1px}.awoo-tag a{fill:var(--link-color)}.awoo-tag-error{padding:.2em}.awoo-tag-error:not(:last-child){border-bottom:1px solid var(--form-input-border-color)}#awoo-error-list,.awoo-tag-deprecated,.awoo-tag-error,.awoo-tag-unknown{background-color:var(--notice-error-background)}#awoo-copy-controls{display:block}#awoo-override-check-container{margin-bottom:0!important;margin-left:.5em}#awoo-tag-list:has(>ul:empty){display:none}";class Logger {
+(function(Alpine){'use strict';var css_248z$2 = "#awoo-tag-list{max-width:100%}.awoo-tag{margin:1px}.awoo-tag a{fill:var(--link-color)}.awoo-tag-error{padding:.2em}.awoo-tag-error:not(:last-child){border-bottom:1px solid var(--form-input-border-color)}#awoo-error-list,.awoo-tag-deprecated,.awoo-tag-error,.awoo-tag-unknown{background-color:var(--notice-error-background)}#awoo-copy-controls{display:block}#awoo-override-check-container{margin-bottom:0!important;margin-left:.5em}#awoo-tag-list:has(>ul:empty){display:none}";function mount(vnode) {
+  if ((vnode == null ? void 0 : vnode.vtype) === 1) {
+    const {
+      type,
+      props
+    } = vnode;
+    if (type === "template") {
+      /* Special handling for template so children are handled correctly */
+      const child = props.children;
+      props.children = undefined;
+      const mounted = VM.hm("template", props, null);
+      mounted.innerHTML = child.outerHTML;
+      return mounted;
+    }
+  }
+  return VM.mountDom(vnode);
+}
+function awoo_jsx_hm$1(...args) {
+  return mount(VM.h(...args));
+}class Logger {
   log(func, ...args) {
     func.apply(null, [`[${this.instance_name}]`, ...args]);
   }
@@ -158,6 +175,13 @@ const CATEGORY_TO_NAME = {
   "4": "character",
   "5": "meta"
 };
+const CATEGORY_TO_ID = {
+  general: 0,
+  artist: 1,
+  copyright: 3,
+  character: 4,
+  meta: 5
+};
 function sanitize_tag_string(tags) {
   return tags.split(/([\s\n])/).map(tag => tag.toLowerCase()).filter(s => /\S/.test(s)).sort();
 }
@@ -237,6 +261,9 @@ class NormalTag extends Tag {
   get category() {
     return this._tag_category;
   }
+  get category_id() {
+    return CATEGORY_TO_ID[this._tag_category];
+  }
   get is_deprecated() {
     return this._is_deprecated;
   }
@@ -307,14 +334,16 @@ class MetaTag extends Tag {
   class_string() {
     return "awoo-tag-meta-tag";
   }
-}const logger$5 = new Logger("TagList");
+}
+unsafeWindow["NormalTag"] = NormalTag;
+unsafeWindow["MetaTag"] = MetaTag;const logger$5 = new Logger("TagList");
 const RESOLVE_DELAY = 500;
 class TagList {
   constructor() {
-    this._state = store.createStore({});
-    this._pending = store.createStore({});
+    this._state = Alpine.reactive({});
+    this._pending = Alpine.reactive({});
     setInterval(async () => {
-      const tags = Object.values(this._pending[0]);
+      const tags = Object.values(this._pending);
       if (tags.length === 0) {
         return;
       }
@@ -374,9 +403,7 @@ class TagList {
     }
   }
   apply_tags(tags) {
-    solidJs.batch(() => {
-      tags.map(t => this.apply_tag(t));
-    });
+    tags.map(t => this.apply_tag(t));
   }
   remove_tag(tag) {
     tag = Tag.parse_tag(tag);
@@ -384,33 +411,31 @@ class TagList {
     this._remove_pending(tag);
   }
   remove_tags(tags) {
-    solidJs.batch(() => {
-      tags.map(t => this.remove_tag(t));
-    });
+    tags.map(t => this.remove_tag(t));
   }
   _has_tag(tag) {
-    return Object.prototype.hasOwnProperty.call(this._state[0], tag.unique_name());
+    return Object.prototype.hasOwnProperty.call(this._state, tag.unique_name());
   }
   _has_pending(tag) {
-    return Object.prototype.hasOwnProperty.call(this._pending[0], tag.unique_name());
+    return Object.prototype.hasOwnProperty.call(this._pending, tag.unique_name());
   }
   _store_tag(tag) {
-    this._state[1](tag.unique_name(), tag);
+    this._state[tag.unique_name()] = tag;
   }
   _store_pending(tag) {
-    this._pending[1](tag.unique_name(), tag);
+    this._pending[tag.unique_name()] = tag;
   }
   _remove_tag(tag) {
-    this._state[1](tag.unique_name(), undefined);
+    delete this._state[tag.unique_name()];
   }
   _remove_pending(tag) {
-    this._pending[1](tag.unique_name(), undefined);
+    delete this._pending[tag.unique_name()];
   }
   get length() {
-    return Object.keys(this._state[0]).length + Object.keys(this._pending[0]).length;
+    return Object.keys(this._state).length + Object.keys(this._pending).length;
   }
   get tags() {
-    return [...Object.values(this._state[0]), ...Object.values(this._pending[0])];
+    return [...Object.values(this._state), ...Object.values(this._pending)];
   }
   get tag_string() {
     return this.tags.map(t => t.tag_string()).join(" ");
@@ -434,7 +459,7 @@ class TagList {
     return this._has_tag(tag) || this._has_pending(tag);
   }
   get(tag) {
-    return this._state[0][tag] || this._pending[0][tag];
+    return this._state[tag] || this._pending[tag];
   }
   count_for_category(category) {
     let count = 0;
@@ -474,6 +499,9 @@ class TagList {
       dataType: "json",
       data: request_data
     });
+
+    // TODO: ensure tags are still in the list before adding them back
+
     const add_map = {};
     tags.forEach(tag => add_map[tag.unique_name()] = tag.is_add);
     return res.map(data => new NormalTag(data.name, CATEGORY_TO_NAME[data.category.toString()], data.is_deprecated, false, add_map[data.name]));
@@ -698,27 +726,21 @@ class Autocorrect {
     }
     return [tag, false];
   }
-}var _tmpl$$3 = /*#__PURE__*/web.template(`<svg xmlns=http://www.w3.org/2000/svg viewBox="0 0 512 512"class="icon svg-icon"><path d="M441 58.9L453.1 71c9.4 9.4 9.4 24.6 0 33.9L424 134.1 377.9\n                88 407 58.9c9.4-9.4 24.6-9.4 33.9 0zM209.8 256.2L344 121.9\n                390.1 168 255.8 302.2c-2.9 2.9-6.5 5-10.4 6.1l-58.5 16.7\n                16.7-58.5c1.1-3.9 3.2-7.5 6.1-10.4zM373.1 25L175.8\n                222.2c-8.7 8.7-15 19.4-18.3 31.1l-28.6 100c-2.4 8.4-.1\n                17.4 6.1 23.6s15.2 8.5 23.6 6.1l100-28.6c11.8-3.4 22.5-9.7\n                31.1-18.3L487 138.9c28.1-28.1 28.1-73.7 0-101.8L474.9 25C446.8-3.1\n                401.2-3.1 373.1 25zM88 64C39.4 64 0 103.4 0 152L0 424c0 48.6 39.4\n                88 88 88l272 0c48.6 0 88-39.4 88-88l0-112c0-13.3-10.7-24-24-24s-24\n                10.7-24 24l0 112c0 22.1-17.9 40-40 40L88 464c-22.1 0-40-17.9-40-40l0-272c0-22.1\n                17.9-40 40-40l112 0c13.3 0 24-10.7 24-24s-10.7-24-24-24L88 64z">`),
-  _tmpl$2$2 = /*#__PURE__*/web.template(`<svg xmlns=http://www.w3.org/2000/svg viewBox="0 0 384 512"class="icon svg-icon"><path d="M342.6 150.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L192\n                210.7 86.6 105.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3L146.7\n                256 41.4 361.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L192 301.3\n                297.4 406.6c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L237.3 256 342.6 150.6z">`),
-  _tmpl$3$2 = /*#__PURE__*/web.template(`<input type=text id=awoo-tag-box>`),
-  _tmpl$4$2 = /*#__PURE__*/web.template(`<span id=awoo-copy-controls><a href=javascript:void()>Copy tags</a>&nbsp;-&nbsp;<a href=javascript:void()>Paste tags`),
-  _tmpl$5$1 = /*#__PURE__*/web.template(`<hr>`),
-  _tmpl$6$1 = /*#__PURE__*/web.template(`<div id=awoo-error-list class="p-2 h-fit space-y-t card"><ul>`),
-  _tmpl$7 = /*#__PURE__*/web.template(`<div id=awoo-tag-list class="p-2 h-fit space-y-1 card"><ul>`),
-  _tmpl$8 = /*#__PURE__*/web.template(`<li class=awoo-tag-error>`),
-  _tmpl$9 = /*#__PURE__*/web.template(`<a href=#>`),
-  _tmpl$10 = /*#__PURE__*/web.template(`<a target=_blank>`),
-  _tmpl$11 = /*#__PURE__*/web.template(`<div class="input boolean optional inline-block"id=awoo-override-check-container><input class="boolean optional"type=checkbox id=awoo-override-check><label class="boolean optional"for=awoo-override-check>Skip check`);
-const logger$4 = new Logger("BetterTagBox");
-const EDIT_ICON = () => _tmpl$$3().cloneNode(true);
-const DELETE_ICON = () => _tmpl$2$2().cloneNode(true);
-const CATEGORY_TO_ID = {
-  general: 0,
-  artist: 1,
-  copyright: 3,
-  character: 4,
-  meta: 5
-};
+}const logger$4 = new Logger("BetterTagBox");
+const EDIT_ICON = () => awoo_jsx_hm("svg", {
+  xmlns: "http://www.w3.org/2000/svg",
+  viewBox: "0 0 512 512",
+  class: "icon svg-icon"
+}, awoo_jsx_hm("path", {
+  d: "M441 58.9L453.1 71c9.4 9.4 9.4 24.6 0 33.9L424 134.1 377.9 88 407 58.9c9.4-9.4 24.6-9.4 33.9 0zM209.8 256.2L344 121.9 390.1 168 255.8 302.2c-2.9 2.9-6.5 5-10.4 6.1l-58.5 16.7 16.7-58.5c1.1-3.9 3.2-7.5 6.1-10.4zM373.1 25L175.8 222.2c-8.7 8.7-15 19.4-18.3 31.1l-28.6 100c-2.4 8.4-.1 17.4 6.1 23.6s15.2 8.5 23.6 6.1l100-28.6c11.8-3.4 22.5-9.7 31.1-18.3L487 138.9c28.1-28.1 28.1-73.7 0-101.8L474.9 25C446.8-3.1 401.2-3.1 373.1 25zM88 64C39.4 64 0 103.4 0 152L0 424c0 48.6 39.4 88 88 88l272 0c48.6 0 88-39.4 88-88l0-112c0-13.3-10.7-24-24-24s-24 10.7-24 24l0 112c0 22.1-17.9 40-40 40L88 464c-22.1 0-40-17.9-40-40l0-272c0-22.1 17.9-40 40-40l112 0c13.3 0 24-10.7 24-24s-10.7-24-24-24L88 64z"
+})).cloneNode(true);
+const DELETE_ICON = () => awoo_jsx_hm("svg", {
+  xmlns: "http://www.w3.org/2000/svg",
+  viewBox: "0 0 384 512",
+  class: "icon svg-icon"
+}, awoo_jsx_hm("path", {
+  d: "M342.6 150.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L192 210.7 86.6 105.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3L146.7 256 41.4 361.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L192 301.3 297.4 406.6c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L237.3 256 342.6 150.6z"
+})).cloneNode(true);
 function node_is_html(node) {
   return node.nodeType === Node.ELEMENT_NODE;
 }
@@ -726,167 +748,264 @@ const GIRL_CHARCOUNTERS = new Set(["1girl", "2girls", "3girls", "4girls", "5girl
 const BOY_CHARCOUNTERS = new Set(["1boy", "2boys", "3boys", "4boys", "5boys", "6+boys"]);
 const OTHER_CHARCOUNTERS = new Set(["1other", "2others", "3others", "4others", "5others", "6+others"]);
 const MUTUALLY_EXCLUSIVE = [[...GIRL_CHARCOUNTERS], [...BOY_CHARCOUNTERS], [...OTHER_CHARCOUNTERS], [["commentary_request", "partial_commentary"], "commentary"], ["solo", [...GIRL_CHARCOUNTERS.difference(new Set(["1girl"]))]], ["solo", [...BOY_CHARCOUNTERS.difference(new Set(["1boy"]))]], ["solo", [...OTHER_CHARCOUNTERS.difference(new Set(["1other"]))]]];
-class BetterTagBoxFeature extends Feature {
-  constructor() {
-    super("BetterTagBox");
-    this._history = [];
-    Options.register_feature("BetterTagBox", this);
+class BetterTagBox {
+  get tag_list_callbacks() {
+    const callback_builder = category => [category, t => t instanceof NormalTag && !t.is_deprecated && t.category === category];
+    const callbacks = [...NormalTagCategories.map(callback_builder), ["metatags", t => t instanceof MetaTag], ["deprecated", t => t instanceof NormalTag && t.is_deprecated], ["unknown", t => t instanceof NormalTag && t.category === "unknown"]];
+    return callbacks;
   }
-  get _tag_box_value() {
-    /* Normalized */
-    return $("#awoo-tag-box").val().toLowerCase().trim().replace(" ", "_");
+  set tag_string(tags) {
+    this.tag_list.apply_tags(sanitize_tag_string(tags));
   }
-  set _tag_box_value(val) {
+  set tag_box(val) {
     $("#awoo-tag-box").val(val);
   }
-  _can_submit() {
-    let ret = true;
-    const notice = [];
-    const error_tags = new Set();
-
-    /// Has rating
-    if ($("input[name='post[rating]']:checked").length === 0) {
-      ret = false;
-      notice.push("No rating");
-    }
-    ///
-
-    /// Has tags at all
-    if (this.tag_list.length === 0) {
-      ret = false;
-      notice.push("No tags");
-    }
-    ///
-
-    /// Has deprecated, pending, unknown tags
-    const deprecated_tags = [];
-    const pending_tags = [];
-    const unknown_tags = [];
-    for (const tag of this.tag_list.tags.filter(t => t instanceof NormalTag)) {
-      if (tag.is_deprecated) {
-        deprecated_tags.push(tag);
-      } else if (tag.category === "unknown") {
-        if (tag.is_new) {
-          unknown_tags.push(tag);
-        } else {
-          pending_tags.push(tag);
-        }
-      }
-    }
-    ret && (ret = deprecated_tags.length === 0 && pending_tags.length === 0 && unknown_tags.length === 0);
-    if (deprecated_tags.length > 0) notice.push(`Deprecated: ${deprecated_tags.join(", ")}`);
-    // This would be annoying
-    // if (   pending_tags.length > 0) notice.push(`Pending: ${pending_tags.join(", ")}`);
-    if (unknown_tags.length > 0) notice.push(`Unknown: ${unknown_tags.join(", ")}`);
-    ///
-
-    /// No artist tag if required
-    if (this.tag_list.count_for_category("artist") === 0) {
-      if (!this.tag_list.contains("artist_request") && !this.tag_list.contains("official_art")) {
-        notice.push("No artist");
-        ret = false;
-      }
-    }
-    ///
-
-    /// No copyright tags
-    if (this.tag_list.count_for_category("copyright") === 0 && !this.tag_list.contains("copyright_request")) {
-      notice.push("No copyright");
-      ret = false;
-    }
-    ///
-
-    /// No mutually exclusive tags
-    const tags = new Set(this.tag_list.tag_names);
-    for (const group of MUTUALLY_EXCLUSIVE) {
-      const matches = [];
-      for (const item of group) {
-        if (typeof item === "string") {
-          for (const tag of tags) {
-            if (item === tag) {
-              matches.push(tag);
-              /* Tags are unique aslready */
-              break;
-            }
-          }
-        } else {
-          const submatches = [];
-          for (const tag of tags) {
-            if (item.includes(tag)) {
-              submatches.push(tag);
-            }
-          }
-          if (submatches.length > 0) {
-            matches.push(submatches);
-          }
-        }
-      }
-      if (matches.length > 1) {
-        const flat_matches = matches.flat();
-        notice.push(`Conflicting tags: ${flat_matches.sort().join(", ")}`);
-        flat_matches.forEach(match => error_tags.add(match));
-      }
-    }
-
-    ///
-
-    /// No charcounters
-    if (!tags.has("no_humans") && [...tags].filter(t => GIRL_CHARCOUNTERS.has(t) || BOY_CHARCOUNTERS.has(t) || OTHER_CHARCOUNTERS.has(t)).length === 0) {
-      ret = false;
-      notice.push("No charcounters");
-    }
-    ///
-
-    /// No commentary tags despite being applicable
-    if (!tags.has("commentary") && !tags.has("commentary_request") && !tags.has("symbol-only_commentary") && ($("#post_artist_commentary_original_title,#artist_commentary_original_title").val() || $("#post_artist_commentary_original_description,#artist_commentary_original_description").val())) {
-      ret = false;
-      const commentary = ($("#post_artist_commentary_original_title,#artist_commentary_original_title").val() + $("#post_artist_commentary_original_description,#artist_commentary_original_description").val()).trim();
-      notice.push(`No commentary tags: "${commentary.slice(0, 10)}${commentary.length > 10 ? "..." : ""}"`);
-    }
-    if (($("#post_translated_commentary_title").val() || $("#post_translated_commentary_desc").val()) && !tags.has("commentary") && !tags.has("partial_commentary")) {
-      ret = false;
-      notice.push("No (partial) commentary tag");
-    }
-    ///
-
-    /// Commentary despite there being none
-    // TODO: Handle specific *_commentary tags
-    if (!($("#post_artist_commentary_original_title,#artist_commentary_original_title").val() || $("#post_artist_commentary_original_description,#artist_commentary_original_description").val()) && (tags.has("commentary") || tags.has("commentary_request") || tags.has("partial_commentary"))) {
-      ret = false;
-      const which = [];
-      if (tags.has("commentary")) which.push("commentary");
-      if (tags.has("commentary_request")) which.push("commentary_request");
-      if (tags.has("partial_commentary")) which.push("partial_commentary");
-      notice.push(`Unneeded commentary tags: ${which.join(", ")}`);
-      which.forEach(t => error_tags.add(t));
-    }
-    this._set_notice(notice);
-    this._set_error_tags(error_tags);
-    return ret;
+  get tag_box() {
+    return $("#awoo-tag-box").val().toString().toLocaleLowerCase().trim().replace(" ", "_");
   }
-  _update_selected_tags() {
-    $(".related-tags li").each((_, el) => {
-      const li = $(el);
-      const tag_name = li.find("a[data-tag-name]").data("tag-name");
-      if (this.tag_list.has(t => t.unique_name() === tag_name)) {
-        logger$4.debug("Selecting", li.find("a[data-tag-name]"));
-        li.addClass("selected").find("input").prop("checked", true);
-      } else {
-        li.removeClass("selected").find("input").prop("checked", false);
+  _make_tag_box() {
+    return awoo_jsx_hm(VM.Fragment, null, awoo_jsx_hm("input", {
+      type: "text",
+      id: "awoo-tag-box",
+      "x-on:keydown": "tagbox._tag_box_keydown.bind(tagbox)"
+    }), awoo_jsx_hm("span", {
+      id: "awoo-copy-controls"
+    }, awoo_jsx_hm("a", {
+      href: "javascript:void()",
+      "x-on:click": "$event.preventDefault(); await navigator.clipboard.writeText(tagbox.tag_list.tag_string); Danbooru.Utility.notice('Tags copied'); $($event.target).blur();"
+    }, "Copy tags"), " | ", awoo_jsx_hm("a", {
+      href: "javascript:void()",
+      "x-on:click": "$event.preventDefault(); tagbox.tag_string = await navigator.clipboard.readText(); Danbooru.Utility.notice('Tags pasted'); $($event.target).blur();"
+    }, "Paste tags")), awoo_jsx_hm("template", {
+      "x-if": "tagbox.notice.length > 0"
+    }, awoo_jsx_hm("div", {
+      id: "awoo-error-list",
+      class: "p-2 h-fit space-y-1 card"
+    }, awoo_jsx_hm("ul", null, awoo_jsx_hm("template", {
+      "x-for": "notice in tagbox.notice"
+    }, awoo_jsx_hm("li", {
+      class: "awoo-tag-error",
+      "x-html": "notice"
+    }))))), awoo_jsx_hm("div", {
+      id: "awoo-tag-list",
+      class: "p-2 h-fit space-y-1 card"
+    }, awoo_jsx_hm("ul", null, awoo_jsx_hm("template", {
+      "x-for": "[what, cb] in tagbox.tag_list_callbacks"
+    }, awoo_jsx_hm("span", null, awoo_jsx_hm("template", {
+      "x-for": "tag in tagbox.tag_list.filter(cb).sort()",
+      "x-bind:data-what": "what"
+    }, awoo_jsx_hm("li", {
+      class: "awoo-tag",
+      "x-bind:class": "{ 'awoo-tag-error': tagbox.error_tags.has(tag.tag_string()), [tag.class_string()]: true,  }",
+      "x-bind:data-tag-string": "tag.tag_string()",
+      "x-bind:data-tag-type": "tag?.category || 'unknown'"
+    }, awoo_jsx_hm("template", {
+      "x-if": "tag instanceof MetaTag && tag.key === 'rating'"
+    }, awoo_jsx_hm("span", null, "\xA0\xA0\xA0\xA0\xA0\xA0\xA0")), awoo_jsx_hm("template", {
+      "x-if": "!(tag instanceof MetaTag && tag.key === 'rating')"
+    }, awoo_jsx_hm("span", null, awoo_jsx_hm("a", {
+      href: "javascript:void()",
+      "x-bind:title": "'Remove \"' + tag.display_name() + '\"'",
+      "x-on:click": "$event.preventDefault(); tagbox.tag_list.remove_tag(tag);"
+    }, DELETE_ICON()), "\xA0", awoo_jsx_hm("a", {
+      href: "javascript:void()",
+      "x-bind:title": "'Edit \"' + tag.display_name() + '\"'",
+      "x-on:click": "$event.preventDefault(); tagbox._edit_tag(tag);"
+    }, EDIT_ICON()), "\xA0")), awoo_jsx_hm("a", {
+      target: "_blank",
+      "x-bind:class": "{ ['tag-type-' + tag.category_id]: (tag instanceof NormalTag && tag.is_add && tag.category !== 'unknown') }",
+      "x-bind:href": "'/posts?tags=' + tag.search_string()",
+      "x-text": "tag.display_name()"
+    }))))))));
+  }
+  constructor(el) {
+    this.tag_list = Alpine.reactive(new TagList());
+    this.notice = Alpine.reactive([]);
+    this.error_tags = Alpine.reactive(new Set());
+    this._history = [];
+    this.tag_list = new TagList();
+    $("#post_tag_string").css("display", "none");
+    const _this = this;
+    logger$4.info("Initializing on", el);
+    $.widget("ui.autocomplete", $.ui.autocomplete, {
+      options: {
+        delay: 0,
+        minLength: 1,
+        autoFocus: false,
+        classes: {
+          "ui-autocomplete": "absolute cursor-pointer max-w-480px max-h-480px text-sm border shadow-lg thin-scrollbar"
+        },
+        focus: () => false
+      },
+      _create: function () {
+        this.element.on("keydown.Autocomplete.tab", null, "tab", function (e) {
+          const input = $(this);
+          const instance = input.autocomplete("instance");
+          const menu = instance.menu.element;
+          _this.tag_box = "";
+
+          /* Not actually doing autocomplete */
+          if (!menu.is(":visible")) {
+            logger$4.info("Autocomplete not visible");
+            _this._try_add_tag(_this.tag_box);
+            e.preventDefault();
+            return;
+          }
+
+          /* Autocomplete is open but nothing in focus -> select first one */
+          if (menu.has(".ui-state-active").length === 0) {
+            const first = menu.find(".ui-menu-item").first();
+            const value = first.data("autocomplete-value");
+            const sanitize = s => s.toLowerCase().trim().replaceAll(" ", "_");
+            const original_query = sanitize(first.data("original-query"));
+            //const current_query = sanitize($("#awoo-tag-box").val() as string);
+
+            const is_negated = original_query[0] === "-";
+            input.autocomplete("close");
+            _this._try_add_tag((is_negated ? "-" : "") + value);
+          }
+          e.preventDefault();
+        });
+        this._super();
+      },
+      _renderItem: (list, item) => {
+        item.data("ui-autocomplete-item", item);
+        return list.append(item);
       }
     });
-  }
-  _toggle_tag(e) {
-    e.preventDefault();
-    e.stopImmediatePropagation();
-    const tag = $(e.target).closest("li").find("a").data("tag-name");
-    logger$4.info("Toggling", tag);
-    if (this.tag_list.contains(tag)) {
-      this.tag_list.remove_tag(tag);
-    } else {
-      this.tag_list.apply_tag(tag);
+    $(document).off("change.danbooru", ".related-tags input");
+    $(document).off("click.danbooru", ".related-tags .tag-list a");
+    Danbooru.RelatedTag.update_selected = _ => this._update_selected_tags();
+    Danbooru.RelatedTag.toggle_tag = e => this._toggle_tag(e);
+
+    /* Just intercept all related tags clicks, this results in more consistent behavior */
+    $("#related-tags-container").on("click", "a[data-tag-name]", e => this._toggle_tag(e));
+    const initial_tags = sanitize_tag_string($("#post_tag_string").val() || "");
+    const initial_parent = $("#post_parent_id").val();
+    if (initial_parent) {
+      initial_tags.push(`parent:${initial_parent}`);
     }
-    this._update_selected_tags();
+    const initial_rating = $("#form input[name='post[rating]']:checked").val();
+    if (initial_rating) {
+      initial_tags.push(`rating:${initial_rating}`);
+    }
+
+    /* Make the source's arttag always an arttag, even if it doesnt exist yet */
+    this.tag_string = initial_tags.map(tag => {
+      if (tag === $(".source-data-content a.tag-type-1").text()) {
+        return `artist:${tag}`;
+      }
+      return tag;
+    }).join(" ");
+    Alpine.effect(() => {
+      this._tag_list_updated();
+    });
+    $("#post_tag_string").parent().append(this._make_tag_box()).addClass("flex flex-col gap-2");
+
+    /* Re-implement autocomplete to have more control */
+    $("#awoo-tag-box").autocomplete({
+      select: (_, ui) => {
+        const el = ui.item;
+        $("#awoo-tag-box").val((el.data("is-negated") ? "-" : "") + el.data("autocomplete-value"));
+        this._try_add_tag(this.tag_box);
+      },
+      source: async (req, res) => {
+        res(await this._autocomplete_source(req.term));
+      }
+    });
+    try {
+      $("#post_tag_string").removeAttr("data-autocomplete").off("selectionchange").autocomplete("destroy");
+    } catch (_unused) {
+      /* May throw since autocomplete may not be initialized yet, just ignore */
+    }
+    $("#post_tag_string").data("uiAutocomplete", {
+      close: () => {}
+    });
+    $("label[for='post_tag_string']").attr("for", "awoo-tag-box");
+    $(".post_tag_string .hint").css("display", "none");
+    $("#post_parent_id").on("input", e => {
+      this._try_add_tag(`parent:${$(e.target).val()}`);
+      this._tag_list_updated();
+    });
+    $("#form input[name='post[rating]']").on("click", e => {
+      this._try_add_tag(`rating:${$(e.target).val()}`);
+    });
+    $("#post_tag_string").on("input.danbooru", e => {
+      /* Replace tags by a different value */
+      //this.tag_list.clear();
+      this.tag_string = $(e.target).val();
+    });
+    $("#form input[type='submit']").after(awoo_jsx_hm("div", {
+      class: "input inline-input inline-toggle-switch boolean !m-0",
+      id: "awoo-override-check-container"
+    }, awoo_jsx_hm("input", {
+      class: "boolean optional toggle-switch",
+      type: "checkbox",
+      id: "awoo-override-check",
+      "x-on:change": "tagbox._tag_list_updated()"
+    }), awoo_jsx_hm("label", {
+      class: "boolean optional",
+      for: "awoo-override-check"
+    }, "Skip check")));
+    $(document).one("danbooru:show-related-tags", _ => this._update_selected_tags());
+    switch (PageManager.current_page()) {
+      case Page.UploadSingle:
+        {
+          $("#awoo-tag-box").focus();
+
+          /* Non-web sources don't have source data */
+          if ($(".source-data").length > 0) {
+            new MutationObserver(_ => {
+              this._commentary_changed();
+            }).observe($(".source-data")[0].parentElement, {
+              childList: true
+            });
+            $("#post_artist_commentary_original_title,#post_artist_commentary_original_description").on("change", _ => this._commentary_changed());
+          }
+          break;
+        }
+      case Page.ViewPost:
+        {
+          new MutationObserver(_ => {
+            if ($("#edit").is(":visible")) {
+              $("#awoo-tag-box").focus();
+            }
+          }).observe($("#edit")[0], {
+            attributes: true,
+            attributeFilter: ["style"]
+          });
+          break;
+        }
+    }
+  }
+  _try_add_tag(tag) {
+    if (!tag) {
+      return;
+    }
+    const is_add = tag[0] !== "-";
+
+    /* Don't autocorrect tag removals, this gets in the way of removing typos  */
+    if (is_add) {
+      [tag] = Autocorrect.correct_tag(tag);
+    }
+
+    // const parsed = TagRegistry.parse_tag(is_negated ? tag.slice(1) : tag);
+    const parsed = Tag.parse_tag(tag);
+    logger$4.info("Adding", tag, parsed);
+    if (!parsed) {
+      /* Can't parse it, what to do? */
+      $("#awoo-tag-box").parent().addClass("field_with_errors");
+      $("#awoo-tag-box").one("input", e => e.target.parentElement.classList.remove("field_with_errors"));
+      return;
+    }
+    $("#awoo-tag-box").parent().removeClass("field_with_errors");
+    this.tag_list.apply_tag(parsed);
+
+    /* Only store tag addition in history */
+    if (parsed.is_add && !(parsed instanceof MetaTag && parsed.key === "rating")) {
+      this._history.push(parsed);
+      this._tag_list_updated();
+    }
   }
   _tag_list_updated() {
     $("#post_tag_string").val(this.tag_list.tag_string).trigger("input.$");
@@ -921,11 +1040,169 @@ class BetterTagBoxFeature extends Feature {
       submit_btn.removeAttr("data-submit-queued");
     }
   }
+  _edit_tag(tag) {
+    this.tag_list.remove_tag(tag);
+    const value = tag.display_name();
+    const tag_box = $("#awoo-tag-box");
+    tag_box.val(value);
+    tag_box.select();
+    tag_box[0].setSelectionRange(value.length, value.length);
+    tag_box.autocomplete("search", value);
+  }
+  _update_selected_tags() {
+    $(".related-tags li").each((_, el) => {
+      const li = $(el);
+      const tag_name = li.find("a[data-tag-name]").data("tag-name");
+      if (this.tag_list.has(t => t.unique_name() === tag_name)) {
+        logger$4.debug("Selecting", li.find("a[data-tag-name]"));
+        li.addClass("selected").find("input").prop("checked", true);
+      } else {
+        li.removeClass("selected").find("input").prop("checked", false);
+      }
+    });
+  }
+  _toggle_tag(e) {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    const tag = $(e.target).closest("li").find("a").data("tag-name");
+    logger$4.info("Toggling", tag);
+    if (this.tag_list.contains(tag)) {
+      this.tag_list.remove_tag(tag);
+    } else {
+      this.tag_list.apply_tag(tag);
+    }
+    this._update_selected_tags();
+  }
+  _can_submit() {
+    let ret = true;
+
+    /* This is allowed apparently */
+    this.notice.length = 0;
+    this.error_tags.clear();
+
+    /// Has rating
+    if ($("input[name='post[rating]']:checked").length === 0) {
+      ret = false;
+      this.notice.push("No rating");
+    }
+    ///
+
+    /// Has tags at all
+    if (this.tag_list.length === 0) {
+      ret = false;
+      this.notice.push("No tags");
+    }
+    ///
+
+    /// Has deprecated, pending, unknown tags
+    const deprecated_tags = [];
+    const pending_tags = [];
+    const unknown_tags = [];
+    for (const tag of this.tag_list.tags.filter(t => t instanceof NormalTag)) {
+      if (tag.is_deprecated) {
+        deprecated_tags.push(tag);
+      } else if (tag.category === "unknown") {
+        if (tag.is_new) {
+          unknown_tags.push(tag);
+        } else {
+          pending_tags.push(tag);
+        }
+      }
+    }
+    ret && (ret = deprecated_tags.length === 0 && pending_tags.length === 0 && unknown_tags.length === 0);
+    if (deprecated_tags.length > 0) this.notice.push(`Deprecated: ${deprecated_tags.join(", ")}`);
+    // This would be annoying
+    // if (   pending_tags.length > 0) notice.push(`Pending: ${pending_tags.join(", ")}`);
+    if (unknown_tags.length > 0) this.notice.push(`Unknown: ${unknown_tags.join(", ")}`);
+    ///
+
+    /// No artist tag if required
+    if (this.tag_list.count_for_category("artist") === 0) {
+      if (!this.tag_list.contains("artist_request") && !this.tag_list.contains("official_art")) {
+        this.notice.push("No artist");
+        ret = false;
+      }
+    }
+    ///
+
+    /// No copyright tags
+    if (this.tag_list.count_for_category("copyright") === 0 && !this.tag_list.contains("copyright_request")) {
+      this.notice.push("No copyright");
+      ret = false;
+    }
+    ///
+
+    /// No mutually exclusive tags
+    const tags = new Set(this.tag_list.tag_names);
+    for (const group of MUTUALLY_EXCLUSIVE) {
+      const matches = [];
+      for (const item of group) {
+        if (typeof item === "string") {
+          for (const tag of tags) {
+            if (item === tag) {
+              matches.push(tag);
+              /* Tags are unique already */
+              break;
+            }
+          }
+        } else {
+          const submatches = [];
+          for (const tag of tags) {
+            if (item.includes(tag)) {
+              submatches.push(tag);
+            }
+          }
+          if (submatches.length > 0) {
+            matches.push(submatches);
+          }
+        }
+      }
+      if (matches.length > 1) {
+        const flat_matches = matches.flat();
+        this.notice.push(`Conflicting tags: ${flat_matches.sort().join(", ")}`);
+        flat_matches.forEach(match => this.error_tags.add(match));
+      }
+    }
+
+    ///
+
+    /// No charcounters
+    if (!tags.has("no_humans") && [...tags].filter(t => GIRL_CHARCOUNTERS.has(t) || BOY_CHARCOUNTERS.has(t) || OTHER_CHARCOUNTERS.has(t)).length === 0) {
+      ret = false;
+      this.notice.push("No charcounters");
+    }
+    ///
+
+    /// No commentary tags despite being applicable
+    if (!tags.has("commentary") && !tags.has("commentary_request") && !tags.has("symbol-only_commentary") && ($("#post_artist_commentary_original_title,#artist_commentary_original_title").val() || $("#post_artist_commentary_original_description,#artist_commentary_original_description").val())) {
+      ret = false;
+      const commentary = ($("#post_artist_commentary_original_title,#artist_commentary_original_title").val() + $("#post_artist_commentary_original_description,#artist_commentary_original_description").val()).trim();
+      this.notice.push(`No commentary tags: "${commentary.slice(0, 10)}${commentary.length > 10 ? "..." : ""}"`);
+    }
+    if (($("#post_translated_commentary_title").val() || $("#post_translated_commentary_desc").val()) && !tags.has("commentary") && !tags.has("partial_commentary")) {
+      ret = false;
+      this.notice.push("No (partial) commentary tag");
+    }
+    ///
+
+    /// Commentary despite there being none
+    // TODO: Handle specific *_commentary tags
+    if (!($("#post_artist_commentary_original_title,#artist_commentary_original_title").val() || $("#post_artist_commentary_original_description,#artist_commentary_original_description").val()) && (tags.has("commentary") || tags.has("commentary_request") || tags.has("partial_commentary"))) {
+      ret = false;
+      const which = [];
+      if (tags.has("commentary")) which.push("commentary");
+      if (tags.has("commentary_request")) which.push("commentary_request");
+      if (tags.has("partial_commentary")) which.push("partial_commentary");
+      this.notice.push(`Unneeded commentary tags: ${which.join(", ")}`);
+      which.forEach(t => this.error_tags.add(t));
+    }
+    return ret;
+  }
   _tag_box_keydown(e) {
     switch (e.key) {
       case "Enter":
-        this._try_add_tag(this._tag_box_value);
-        this._tag_list_updated();
+        this._try_add_tag(this.tag_box);
+        this.tag_box = "";
         if (e.ctrlKey) {
           e.preventDefault();
           const submit_btn = $("#form input[type='submit']");
@@ -939,68 +1216,18 @@ class BetterTagBoxFeature extends Feature {
         break;
       case " ":
         e.preventDefault();
-        this._try_add_tag(this._tag_box_value);
+        $("#awoo-tag-box").autocomplete("close");
+        this._try_add_tag(this.tag_box);
+        this.tag_box = "";
         break;
       case "ArrowLeft":
       case "Backspace":
-        if (!this._tag_box_value && e.target.selectionStart === 0) {
+        if (!this.tag_box && e.target.selectionStart === 0) {
           e.preventDefault();
           this._try_undo(e.key === "Backspace");
         }
         break;
     }
-  }
-  _try_undo(select) {
-    if (this._history.length === 0) {
-      return;
-    }
-    const last = this._history.pop();
-    this.tag_list.remove_tag(last);
-    $("#awoo-tag-box").val(last.display_name());
-    if (select) {
-      $("#awoo-tag-box").select();
-    }
-  }
-  _try_add_tag(tag) {
-    if (!tag) {
-      return;
-    }
-    const is_add = tag[0] !== "-";
-
-    /* Don't autocorrect tag removals, this gets in the way of removing typos  */
-    if (is_add) {
-      [tag] = Autocorrect.correct_tag(tag);
-    }
-
-    // const parsed = TagRegistry.parse_tag(is_negated ? tag.slice(1) : tag);
-    const parsed = Tag.parse_tag(tag);
-    logger$4.info("Adding", tag, parsed);
-    if (!parsed) {
-      /* Can't parse it, what to do? */
-      $("#awoo-tag-box").parent().addClass("field_with_errors");
-      $("#awoo-tag-box").one("input", e => e.target.parentElement.classList.remove("field_with_errors"));
-      return;
-    }
-    $("#awoo-tag-box").parent().removeClass("field_with_errors");
-    this.tag_list.apply_tag(parsed);
-
-    /* Only store tag addition in history */
-    this._history.push(parsed);
-    this._tag_box_value = "";
-  }
-  _set_tag_string(tags) {
-    // this.tag_list.clear();
-
-    this.tag_list.apply_tags(sanitize_tag_string(tags).map(Tag.parse_tag));
-  }
-  _edit_tag(tag) {
-    this.tag_list.remove_tag(tag);
-    const value = tag.display_name();
-    const tag_box = $("#awoo-tag-box");
-    tag_box.val(value);
-    tag_box.select();
-    tag_box[0].setSelectionRange(value.length, value.length);
-    tag_box.autocomplete("search", value);
   }
   async _commentary_changed() {
     const source_title = $("#post_artist_commentary_original_title").val();
@@ -1051,137 +1278,16 @@ class BetterTagBoxFeature extends Feature {
     }
     this._tag_list_updated();
   }
-  make_tag_box() {
-    const callback_builder = category => t => t instanceof NormalTag && !t.is_deprecated && t.category === category;
-
-    // TODO: Put negated tags at the bottom
-    const callbacks = [...NormalTagCategories.map(callback_builder), t => t instanceof MetaTag, t => t instanceof NormalTag && t.is_deprecated, t => t instanceof NormalTag && t.category === "unknown"];
-    const _self$ = this;
-    return [(() => {
-      var _el$3 = _tmpl$3$2();
-      _el$3.$$keydown = e => {
-        _self$._tag_box_keydown(e);
-      };
-      return _el$3;
-    })(), (() => {
-      var _el$4 = _tmpl$4$2(),
-        _el$5 = _el$4.firstChild,
-        _el$6 = _el$5.nextSibling,
-        _el$7 = _el$6.nextSibling;
-      _el$5.$$click = async e => {
-        e.preventDefault();
-        await navigator.clipboard.writeText(_self$.tag_list.tag_string);
-        Danbooru.Utility.notice("Tags copied");
-        $(e.target).blur();
-      };
-      _el$7.$$click = async e => {
-        e.preventDefault();
-        _self$._set_tag_string(await navigator.clipboard.readText());
-        Danbooru.Utility.notice("Tags pasted");
-        $(e.target).blur();
-      };
-      return _el$4;
-    })(), _tmpl$5$1(), web.createComponent(solidJs.Show, {
-      get when() {
-        return _self$._notice().length > 0;
-      },
-      get children() {
-        return [(() => {
-          var _el$9 = _tmpl$6$1(),
-            _el$10 = _el$9.firstChild;
-          web.insert(_el$10, web.createComponent(solidJs.For, {
-            get each() {
-              return _self$._notice();
-            },
-            children: msg => (() => {
-              var _el$14 = _tmpl$8();
-              web.insert(_el$14, msg);
-              return _el$14;
-            })()
-          }));
-          return _el$9;
-        })(), _tmpl$5$1()];
-      }
-    }), (() => {
-      var _el$12 = _tmpl$7(),
-        _el$13 = _el$12.firstChild;
-      web.insert(_el$13, web.createComponent(solidJs.For, {
-        each: callbacks,
-        children: cb => web.createComponent(solidJs.For, {
-          get each() {
-            return _self$.tag_list.filter(cb).sort();
-          },
-          children: tag => {
-            return web.createComponent(web.Dynamic, {
-              component: "li",
-              get ["class"]() {
-                return `awoo-tag ${tag.class_string()}${_self$._error_tags().has(tag.tag_string()) ? " awoo-tag-error" : ""}`;
-              },
-              get ["data-tag-string"]() {
-                return tag.tag_string();
-              },
-              get children() {
-                return [web.createComponent(solidJs.Show, {
-                  get when() {
-                    return !(tag instanceof MetaTag && tag.key === "rating");
-                  },
-                  fallback: "\xA0\xA0\xA0\xA0\xA0\xA0\xA0",
-                  get children() {
-                    return [(() => {
-                      var _el$15 = _tmpl$9();
-                      web.addEventListener(_el$15, "click", e => {
-                        e.preventDefault();
-                        _self$.tag_list.remove_tag(tag);
-                      });
-                      web.insert(_el$15, DELETE_ICON);
-                      web.effect(() => web.setAttribute(_el$15, "title", `Remove "${tag.display_name()}"`));
-                      return _el$15;
-                    })(), "\xA0", (() => {
-                      var _el$16 = _tmpl$9();
-                      web.addEventListener(_el$16, "click", e => {
-                        e.preventDefault();
-                        _self$._edit_tag(tag);
-                      });
-                      web.insert(_el$16, EDIT_ICON);
-                      web.effect(() => web.setAttribute(_el$16, "title", `Edit "${tag.display_name()}"`));
-                      return _el$16;
-                    })(), "\xA0"];
-                  }
-                }), web.createComponent(solidJs.Show, {
-                  get when() {
-                    return tag instanceof NormalTag && tag.is_add && tag.category !== "unknown";
-                  },
-                  get fallback() {
-                    return (() => {
-                      var _el$18 = _tmpl$10();
-                      web.insert(_el$18, () => tag.display_name());
-                      web.effect(() => web.setAttribute(_el$18, "href", `/posts?tags=${tag.search_string()}`));
-                      return _el$18;
-                    })();
-                  },
-                  get children() {
-                    var _el$17 = _tmpl$10();
-                    web.insert(_el$17, () => tag.display_name());
-                    web.effect(_p$ => {
-                      var _v$ = `/posts?tags=${tag.search_string()}`,
-                        _v$2 = `tag-type-${CATEGORY_TO_ID[tag.category]}`;
-                      _v$ !== _p$.e && web.setAttribute(_el$17, "href", _p$.e = _v$);
-                      _v$2 !== _p$.t && web.className(_el$17, _p$.t = _v$2);
-                      return _p$;
-                    }, {
-                      e: undefined,
-                      t: undefined
-                    });
-                    return _el$17;
-                  }
-                })];
-              }
-            });
-          }
-        })
-      }));
-      return _el$12;
-    })()];
+  _try_undo(select) {
+    if (this._history.length === 0) {
+      return;
+    }
+    const last = this._history.pop();
+    this.tag_list.remove_tag(last);
+    $("#awoo-tag-box").val(last.display_name());
+    if (select) {
+      $("#awoo-tag-box").select();
+    }
   }
   async _autocomplete_source(query) {
     const is_negated = query[0] === "-";
@@ -1199,172 +1305,23 @@ class BetterTagBoxFeature extends Feature {
     items.forEach(e => e.data("original-query", query).data("is-negated", is_negated));
     return items;
   }
+}
+unsafeWindow["BetterTagBox"] = BetterTagBox;
+class BetterTagBoxFeature extends Feature {
+  constructor() {
+    super("BetterTagBox");
+    Options.register_feature("BetterTagBox", this);
+  }
   enable() {
     logger$4.info("Enabling");
-    const _this = this;
-    $.widget("ui.autocomplete", $.ui.autocomplete, {
-      options: {
-        delay: 0,
-        minLength: 1,
-        autoFocus: false,
-        classes: {
-          "ui-autocomplete": "absolute cursor-pointer max-w-480px max-h-480px text-sm border shadow-lg thin-scrollbar"
-        },
-        focus: () => false
-      },
-      _create: function () {
-        this.element.on("keydown.Autocomplete.tab", null, "tab", function (e) {
-          const input = $(this);
-          const instance = input.autocomplete("instance");
-          const menu = instance.menu.element;
-
-          /* Not actually doing autocomplete */
-          if (!menu.is(":visible")) {
-            logger$4.info("Autocomplete not visible");
-            _this._try_add_tag(_this._tag_box_value);
-            e.preventDefault();
-            return;
-          }
-
-          /* Autocomplete is open but nothing in focus -> select first one */
-          if (menu.has(".ui-state-active").length === 0) {
-            const first = menu.find(".ui-menu-item").first();
-            const value = first.data("autocomplete-value");
-            const sanitize = s => s.toLowerCase().trim().replaceAll(" ", "_");
-            const original_query = sanitize(first.data("original-query"));
-            //const current_query = sanitize($("#awoo-tag-box").val() as string);
-
-            const is_negated = original_query[0] === "-";
-            input.autocomplete("close");
-            _this._try_add_tag((is_negated ? "-" : "") + value);
-          }
-          e.preventDefault();
-        });
-        this._super();
-      },
-      _renderItem: (list, item) => {
-        item.data("ui-autocomplete-item", item);
-        return list.append(item);
-      }
-    });
-    $(document).off("change.danbooru", ".related-tags input");
-    $(document).off("click.danbooru", ".related-tags .tag-list a");
-    Danbooru.RelatedTag.update_selected = _ => this._update_selected_tags();
-    Danbooru.RelatedTag.toggle_tag = e => this._toggle_tag(e);
-
-    /* Just intercept all related tags clicks, this results in more consistent behavior */
-    $("#related-tags-container").on("click", "a[data-tag-name]", e => this._toggle_tag(e));
-    const initial_tags = sanitize_tag_string($("#post_tag_string").val() || "");
-    const initial_parent = $("#post_parent_id").val();
-    if (initial_parent) {
-      initial_tags.push(`parent:${initial_parent}`);
-    }
-    const initial_rating = $("#form input[name='post[rating]']:checked").val();
-    if (initial_rating) {
-      initial_tags.push(`rating:${initial_rating}`);
-    }
-    this.tag_list = new TagList();
-
-    // eslint-disable-next-line solid/reactivity
-    [this._error_tags, this._set_error_tags] = solidJs.createSignal(new Set());
-
-    // eslint-disable-next-line solid/reactivity
-    [this._notice, this._set_notice] = solidJs.createSignal([]);
-    solidJs.createEffect(() => this._tag_list_updated());
-    this._set_tag_string(initial_tags.map(tag => {
-      if (tag === $(".source-data-content a.tag-type-1").text()) {
-        return `artist:${tag}`;
-      }
-      return tag;
-    }).join(" "));
-    web.render(() => this.make_tag_box.bind(this), document.getElementById("post_tag_string").parentElement);
-
-    /* Re-implement autocomplete to have more control */
-    $("#awoo-tag-box").autocomplete({
-      select: (_, ui) => {
-        const el = ui.item;
-        $("#awoo-tag-box").val((el.data("is-negated") ? "-" : "") + el.data("autocomplete-value"));
-        this._try_add_tag(this._tag_box_value);
-      },
-      source: async (req, res) => {
-        res(await this._autocomplete_source(req.term));
-      }
-    });
-    try {
-      $("#post_tag_string").removeAttr("data-autocomplete").css("display", "none").autocomplete("destroy");
-    } catch (_unused) {
-      /* May throw since autocomplete may not be initialized yet, just ignore */
-    }
-    $("#post_tag_string").data("uiAutocomplete", {
-      close: () => {}
-    });
-    $("label[for='post_tag_string']").attr("for", "awoo-tag-box");
-    $(".post_tag_string .hint").css("display", "none");
-    $("#post_parent_id").on("input", e => {
-      this._try_add_tag(`parent:${$(e.target).val()}`);
-      this._tag_list_updated();
-    });
-    $("#form input[name='post[rating]']").on("click", e => {
-      this._try_add_tag(`rating:${$(e.target).val()}`);
-      this._tag_list_updated();
-    });
-    $("#post_tag_string").on("input.danbooru", e => {
-      /* Replace tags by a different value */
-      //this.tag_list.clear();
-      this._set_tag_string($(e.target).val());
-    });
-    const _self$2 = this;
-    $("#form input[type='submit']").after((() => {
-      var _el$19 = _tmpl$11(),
-        _el$20 = _el$19.firstChild;
-      web.addEventListener(_el$20, "change", _ => _self$2._tag_list_updated());
-      return _el$19;
-    })());
-    $(document).one("danbooru:show-related-tags", _ => this._update_selected_tags());
-    switch (PageManager.current_page()) {
-      case Page.UploadSingle:
-        {
-          $("#awoo-tag-box").focus();
-
-          /* Non-web sources don't have source data */
-          if ($(".source-data").length > 0) {
-            new MutationObserver(_ => {
-              this._commentary_changed();
-            }).observe($(".source-data")[0].parentElement, {
-              childList: true
-            });
-            $("#post_artist_commentary_original_title,#post_artist_commentary_original_description").on("change", _ => this._commentary_changed());
-          }
-          break;
-        }
-      case Page.ViewPost:
-        {
-          new MutationObserver(_ => {
-            if ($("#edit").is(":visible")) {
-              $("#awoo-tag-box").focus();
-            }
-          }).observe($("#edit")[0], {
-            attributes: true,
-            attributeFilter: ["style"]
-          });
-          break;
-        }
-    }
+    $(".upload-edit-container, #edit").attr("x-data", "{ tagbox: new BetterTagBox($el) }");
   }
   disable() {
     logger$4.info("Disabling");
   }
-}
-web.delegateEvents(["keydown", "click"]);/* Sometimes JSXElement is an array, but this gives expected behavior always */
-function notice(msg) {
+}function notice(msg) {
   Danbooru.notice($("<span>").append(msg).html());
-}var _tmpl$$2 = /*#__PURE__*/web.template(`<span> Tags copied. Please check the `),
-  _tmpl$2$1 = /*#__PURE__*/web.template(`<a class=tag-type-5 href=/wiki_pages/commentary target=_blank>commentary`),
-  _tmpl$3$1 = /*#__PURE__*/web.template(`<span> and `),
-  _tmpl$4$1 = /*#__PURE__*/web.template(`<a class=tag-type-5 href=/wiki_pages/translation_request target=_blank>translation`),
-  _tmpl$5 = /*#__PURE__*/web.template(`<span> tags.`),
-  _tmpl$6 = /*#__PURE__*/web.template(`<div>Make: <a class=awoo-link href=#>parent</a><span class=awoo-sep> | </span><a class=awoo-link href=#>nth child</a><span class=awoo-sep> | </span><a class=awoo-link href=#>child`);
-const logger$3 = new Logger("OneUp");
+}const logger$3 = new Logger("OneUp");
 const DO_NOT_COPY_LIST = ["corrupted_twitter_file", "md5_mismatch", "resolution_mismatch", "bad_id", "bad_link", "bad_source", "resized", "resolution_mismatch", "source_larger", "source_smaller", "duplicate", "pixel-perfect_duplicate", /* Auto-added */
 "lowres", "highres", "absurdres", "incredibly_absurdres", "wide_image", "tall_image", "animated_gif", "animated_png", "flash", "video", "ugoira", "exif_rotation", "non-repeating_animation", "sound", "non-web_source"];
 class OneUpFeature extends Feature {
@@ -1373,13 +1330,11 @@ class OneUpFeature extends Feature {
     Options.register_feature("oneup", this);
   }
   copy_tags(data, e) {
+    console.log(data, e);
     e.preventDefault();
     if (data.mode === "another_child") {
       $("#post_tag_string").val($("#post_tag_string").val() + ` child:${data.post.dataset.id}`);
       $("#post_tag_string").trigger("input");
-
-      /* This isn't actually a component, eslint */
-      // eslint-disable-next-line solid/components-return-once
       return;
     }
 
@@ -1411,40 +1366,52 @@ class OneUpFeature extends Feature {
     $(`#post_rating_${data.post.dataset.rating}`).click();
     $(".tab.source-tab")[0].click();
     if (was_translated) {
-      notice([_tmpl$$2(), _tmpl$2$1(), _tmpl$3$1(), _tmpl$4$1(), _tmpl$5()]);
+      notice(awoo_jsx_hm(VM.Fragment, null, awoo_jsx_hm("span", null, " Tags copied. Please check the "), awoo_jsx_hm("a", {
+        class: "tag-type-5",
+        href: "/wiki_pages/commentary",
+        target: "_blank"
+      }, "commentary"), awoo_jsx_hm("span", null, " and "), awoo_jsx_hm("a", {
+        class: "tag-type-5",
+        href: "/wiki_pages/translation_request",
+        target: "_blank"
+      }, "translation"), awoo_jsx_hm("span", null, " tags.")));
     } else {
-      notice([_tmpl$$2(), _tmpl$2$1(), _tmpl$5()]);
+      notice(awoo_jsx_hm(VM.Fragment, null, awoo_jsx_hm("span", null, " Tags copied. Please check the "), awoo_jsx_hm("a", {
+        class: "tag-type-5",
+        href: "/wiki_pages/commentary",
+        target: "_blank"
+      }, "commentary"), awoo_jsx_hm("span", null, " tags.")));
     }
   }
   process_elements() {
     for (const post of document.querySelectorAll(".iqdb-posts article")) {
       const target = post.querySelector(":has(> div > .iqdb-similarity-score)");
-      const _self$ = this;
-      target.appendChild((() => {
-        var _el$9 = _tmpl$6(),
-          _el$10 = _el$9.firstChild,
-          _el$11 = _el$10.nextSibling,
-          _el$12 = _el$11.nextSibling,
-          _el$13 = _el$12.nextSibling,
-          _el$14 = _el$13.nextSibling,
-          _el$15 = _el$14.nextSibling;
-        _el$11.$$click = _self$.copy_tags.bind(_self$);
-        _el$11.$$clickData = {
+      target.appendChild(awoo_jsx_hm("div", null, "Make: ", awoo_jsx_hm("a", {
+        class: "awoo-link",
+        href: "#",
+        onclick: this.copy_tags.bind(this, {
           post,
           mode: "parent"
-        };
-        _el$13.$$click = _self$.copy_tags.bind(_self$);
-        _el$13.$$clickData = {
+        })
+      }, "parent"), awoo_jsx_hm("span", {
+        class: "awoo-sep"
+      }, " | "), awoo_jsx_hm("a", {
+        class: "awoo-link",
+        href: "#",
+        onclick: this.copy_tags.bind(this, {
           post,
           mode: "another_child"
-        };
-        _el$15.$$click = _self$.copy_tags.bind(_self$);
-        _el$15.$$clickData = {
+        })
+      }, "nth child"), awoo_jsx_hm("span", {
+        class: "awoo-sep"
+      }, " | "), awoo_jsx_hm("a", {
+        class: "awoo-link",
+        href: "#",
+        onclick: this.copy_tags.bind(this, {
           post,
           mode: "child"
-        };
-        return _el$9;
-      })());
+        })
+      }, "child")));
     }
   }
   enable() {
@@ -1473,9 +1440,7 @@ class OneUpFeature extends Feature {
   disable() {
     logger$3.info("Disabling");
   }
-}
-web.delegateEvents(["click"]);var css_248z$1 = ".media-asset-component{--maybe-max-height:calc(100vh - max(1rem, var(--header-visible-height)));--height:calc(max(var(--min-asset-height), var(--maybe-max-height)));max-height:var(--height)!important;min-height:var(--height)!important;overflow:hidden!important;position:sticky!important}.media-asset-component .media-asset-container{height:100%!important;width:100%!important}.media-asset-component .media-asset-zoom-level{cursor:pointer;pointer-events:all;z-index:1}.media-asset-component .media-asset-image{cursor:default;max-height:100%!important;max-width:100%!important}.media-asset-component .media-asset-panzoom{align-items:center;display:flex;flex:1;height:100%;justify-content:center;width:100%}.upload-image-container{overflow-x:hidden}";var _tmpl$$1 = /*#__PURE__*/web.template(`<div class=media-asset-panzoom>`);
-/**
+}var css_248z$1 = ".media-asset-component{--maybe-max-height:calc(100vh - max(1rem, var(--header-visible-height)));--height:calc(max(var(--min-asset-height), var(--maybe-max-height)));max-height:var(--height)!important;min-height:var(--height)!important;overflow:hidden!important;position:sticky!important}.media-asset-component .media-asset-container{height:100%!important;width:100%!important}.media-asset-component .media-asset-zoom-level{cursor:pointer;pointer-events:all;z-index:1}.media-asset-component .media-asset-image{cursor:default;max-height:100%!important;max-width:100%!important}.media-asset-component .media-asset-panzoom{align-items:center;display:flex;flex:1;height:100%;justify-content:center;width:100%}.upload-image-container{overflow-x:hidden}";/**
  * Based on hdk5's panzoom:
  * https://github.com/hdk5/danbooru.user.js/blob/master/dist/mediaasset-panzoom.user.js
  */
@@ -1484,7 +1449,9 @@ const logger$2 = new Logger("Panzoom");
 class PanzoomFeature extends Feature {
   constructor() {
     super("panzoom");
-    this._panzoom = $(_tmpl$$1());
+    this._panzoom = $(awoo_jsx_hm("div", {
+      class: "media-asset-panzoom"
+    }));
     Options.register_feature("panzoom", this);
   }
   _fit() {
@@ -1524,22 +1491,16 @@ class PanzoomFeature extends Feature {
   disable() {
     logger$2.info("Disabling");
   }
-}var css_248z = ".awoo-recently-added{background:var(--wiki-page-versions-diff-ins-background)}";var _tmpl$ = /*#__PURE__*/web.template(`<a>View`),
-  _tmpl$2 = /*#__PURE__*/web.template(`<li id=post-info-views>`),
-  _tmpl$3 = /*#__PURE__*/web.template(`<a id=view-wiki-link target=_blank>Create wiki`),
-  _tmpl$4 = /*#__PURE__*/web.template(`<span> | `);
-const logger$1 = new Logger("UITweaks");
+}var css_248z = ".awoo-recently-added{background:var(--wiki-page-versions-diff-ins-background)}";const logger$1 = new Logger("UITweaks");
 class UITweaks extends Feature {
   constructor() {
     super("UITweaks");
     Options.register_feature("UITweaks", this);
   }
   _feedback_direct_link() {
-    const make_link = id => (() => {
-      var _el$ = _tmpl$();
-      web.setAttribute(_el$, "href", `/user_feedbacks/${id}`);
-      return _el$;
-    })();
+    const make_link = id => awoo_jsx_hm("a", {
+      href: `/user_feedbacks/${id}`
+    }, "View");
     const table = $("#user-feedbacks-table");
     table.find("th.control-column").text("Control");
     table.find("tbody > tr").each((_, el) => {
@@ -1563,17 +1524,15 @@ class UITweaks extends Feature {
       throw new Error(`Couldn't find row: ${header}`);
     };
     const get_count = hdr => $(document.body).data(`user-${hdr}-count`);
-    get_row("Uploads").append(`(${(get_count("post-upload") / get_count("post-update") * 100 || 0).toFixed(2)}% of post changes)`);
-    const deleted = get_row("Deleted Uploads");
+    get_row("Posts").append(`(${(get_count("post-upload") / get_count("post-update") * 100 || 0).toFixed(2)}% of post changes)`);
+    const deleted = get_row("Deleted Posts");
     deleted.append(`(${(+deleted.find("a").text() / get_count("post-upload") * 100 || 0).toFixed(2)}% of uploads)`);
   }
   async _view_count() {
     const views = await $.get(`https://isshiki.donmai.us/post_views/${$(document.body).data("post-id")}`);
-    $("#post-info-favorites").after((() => {
-      var _el$2 = _tmpl$2();
-      web.insert(_el$2, `Views: ${views}`);
-      return _el$2;
-    })());
+    $("#post-info-favorites").after(awoo_jsx_hm("li", {
+      id: "post-info-views"
+    }, `Views: ${views}`));
   }
   async _recent_tags() {
     /* Based on Nameless Contributor's userscript */
@@ -1605,11 +1564,11 @@ class UITweaks extends Feature {
     const container = $("#view-artist-link").parent();
     if (container.has("#view-wiki-link").length === 0) {
       const artist_name = new URLSearchParams($("#a-show > div.flex.items-center.gap-2 > a").attr("href").split("?")[1]).get("tags");
-      container.prepend([(() => {
-        var _el$3 = _tmpl$3();
-        web.setAttribute(_el$3, "href", `/wiki_pages/new?wiki_page[title]=${artist_name}`);
-        return _el$3;
-      })(), _tmpl$4()]);
+      container.prepend(awoo_jsx_hm(VM.Fragment, null, awoo_jsx_hm("a", {
+        id: "view-wiki-link",
+        href: `/wiki_pages/new?wiki_page[title]=${artist_name}`,
+        target: "_blank"
+      }, "Create wiki"), awoo_jsx_hm("span", null, " | ")));
     }
   }
   enable() {
@@ -1636,7 +1595,9 @@ class UITweaks extends Feature {
   disable() {
     logger$1.info("Disabling");
   }
-}const feature_mapping = {
+}unsafeWindow["awoo_jsx_hm"] = awoo_jsx_hm$1;
+unsafeWindow["VM"] = VM;
+const feature_mapping = {
   [Page.UploadSingle]: [BetterTagBoxFeature, OneUpFeature, PanzoomFeature],
   [Page.UploadMultiple]: [],
   [Page.ViewPost]: [BetterTagBoxFeature, UITweaks],
@@ -1655,4 +1616,4 @@ if (features.length === 0) {
 const active_features = features.map(feature => new feature());
 if (active_features.length > 0) {
   GM_addStyle(css_248z$2);
-}})(VM.solid.web,VM.solid,VM.solid.store);
+}})(Alpine);

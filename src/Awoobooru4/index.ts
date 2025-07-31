@@ -2,6 +2,8 @@ import './meta.js?userscript-metadata';
 
 import globalCss from './style.scss';
 
+import { awoo_jsx_hm } from './awoo-jsx';
+
 import Logger from './Logger';
 import { Page, PageManager } from './PageManager';
 import BetterTagBoxFeature from "./BetterTagBox";
@@ -9,6 +11,9 @@ import OneUpFeature from "./OneUp";
 import PanzoomFeature from "./Panzoom";
 import Feature from './Feature';
 import UITweaks from './UITweaks';
+
+unsafeWindow["awoo_jsx_hm"] = awoo_jsx_hm;
+unsafeWindow["VM"] = VM;
 
 const feature_mapping: { [key in Page]: (typeof Feature)[] } = {
     [Page.UploadSingle]: [ BetterTagBoxFeature, OneUpFeature, PanzoomFeature ],
