@@ -155,13 +155,15 @@ export class BetterTagBox {
     }
 
     public constructor(el: HTMLElement) {
+        logger.info("Initializing on", el);
+
         this.tag_list = new TagList();
 
         $("#post_tag_string").css("display", "none");
+    }
 
+    public init() {
         const _this = this;
-
-        logger.info("Initializing on", el);
 
         $.widget("ui.autocomplete", $.ui.autocomplete, {
             options: {
@@ -758,7 +760,9 @@ export default class BetterTagBoxFeature extends Feature {
     public enable() {
         logger.info("Enabling");
 
-        $(".upload-edit-container, #edit").attr("x-data", "{ tagbox: new BetterTagBox($el) }");
+        $(".upload-edit-container, #edit")
+            .attr("x-init", "tagbox.init()")
+            .attr("x-data", "{ tagbox: new BetterTagBox($el) }");
     }
 
     public disable() {

@@ -3,7 +3,7 @@
 // @namespace   https://github.com/TypeA2/booru-scripts
 // @match       *://*.donmai.us/*
 // @match       *://cos.lycore.co/*
-// @version     4.1.0
+// @version     4.1.1
 // @author      TypeA2
 // @description Various utilities to make life easier
 // @require     https://cdn.jsdelivr.net/npm/@violentmonkey/dom@2
@@ -823,10 +823,12 @@ class BetterTagBox {
     this.notice = Alpine.reactive([]);
     this.error_tags = Alpine.reactive(new Set());
     this._history = [];
+    logger$4.info("Initializing on", el);
     this.tag_list = new TagList();
     $("#post_tag_string").css("display", "none");
+  }
+  init() {
     const _this = this;
-    logger$4.info("Initializing on", el);
     $.widget("ui.autocomplete", $.ui.autocomplete, {
       options: {
         delay: 0,
@@ -1314,7 +1316,7 @@ class BetterTagBoxFeature extends Feature {
   }
   enable() {
     logger$4.info("Enabling");
-    $(".upload-edit-container, #edit").attr("x-data", "{ tagbox: new BetterTagBox($el) }");
+    $(".upload-edit-container, #edit").attr("x-init", "tagbox.init()").attr("x-data", "{ tagbox: new BetterTagBox($el) }");
   }
   disable() {
     logger$4.info("Disabling");
