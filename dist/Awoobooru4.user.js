@@ -3,7 +3,7 @@
 // @namespace   https://github.com/TypeA2/booru-scripts
 // @match       *://*.donmai.us/*
 // @match       *://cos.lycore.co/*
-// @version     4.1.2
+// @version     4.1.3
 // @author      TypeA2
 // @description Various utilities to make life easier
 // @require     https://cdn.jsdelivr.net/npm/@violentmonkey/dom@2
@@ -763,61 +763,6 @@ class BetterTagBox {
   get tag_box() {
     return $("#awoo-tag-box").val().toString().toLocaleLowerCase().trim().replace(" ", "_");
   }
-  _make_tag_box() {
-    return awoo_jsx_hm(VM.Fragment, null, awoo_jsx_hm("input", {
-      type: "text",
-      id: "awoo-tag-box",
-      "x-on:keydown": "tagbox._tag_box_keydown.bind(tagbox)"
-    }), awoo_jsx_hm("span", {
-      id: "awoo-copy-controls"
-    }, awoo_jsx_hm("a", {
-      href: "javascript:void()",
-      "x-on:click": "$event.preventDefault(); await navigator.clipboard.writeText(tagbox.tag_list.tag_string); Danbooru.Utility.notice('Tags copied'); $($event.target).blur();"
-    }, "Copy tags"), " | ", awoo_jsx_hm("a", {
-      href: "javascript:void()",
-      "x-on:click": "$event.preventDefault(); tagbox.tag_string = await navigator.clipboard.readText(); Danbooru.Utility.notice('Tags pasted'); $($event.target).blur();"
-    }, "Paste tags")), awoo_jsx_hm("template", {
-      "x-if": "tagbox.notice.length > 0"
-    }, awoo_jsx_hm("div", {
-      id: "awoo-error-list",
-      class: "p-2 h-fit space-y-1 card"
-    }, awoo_jsx_hm("ul", null, awoo_jsx_hm("template", {
-      "x-for": "notice in tagbox.notice"
-    }, awoo_jsx_hm("li", {
-      class: "awoo-tag-error",
-      "x-html": "notice"
-    }))))), awoo_jsx_hm("div", {
-      id: "awoo-tag-list",
-      class: "p-2 h-fit space-y-1 card"
-    }, awoo_jsx_hm("ul", null, awoo_jsx_hm("template", {
-      "x-for": "[what, cb] in tagbox.tag_list_callbacks"
-    }, awoo_jsx_hm("span", null, awoo_jsx_hm("template", {
-      "x-for": "tag in tagbox.tag_list.filter(cb).sort()",
-      "x-bind:data-what": "what"
-    }, awoo_jsx_hm("li", {
-      class: "awoo-tag",
-      "x-bind:class": "{ 'awoo-tag-error': tagbox.error_tags.has(tag.tag_string()), [tag.class_string()]: true,  }",
-      "x-bind:data-tag-string": "tag.tag_string()",
-      "x-bind:data-tag-type": "tag?.category || 'unknown'"
-    }, awoo_jsx_hm("template", {
-      "x-if": "tag instanceof MetaTag && tag.key === 'rating'"
-    }, awoo_jsx_hm("span", null, "\xA0\xA0\xA0\xA0\xA0\xA0\xA0")), awoo_jsx_hm("template", {
-      "x-if": "!(tag instanceof MetaTag && tag.key === 'rating')"
-    }, awoo_jsx_hm("span", null, awoo_jsx_hm("a", {
-      href: "javascript:void()",
-      "x-bind:title": "'Remove \"' + tag.display_name() + '\"'",
-      "x-on:click": "$event.preventDefault(); tagbox.tag_list.remove_tag(tag);"
-    }, DELETE_ICON()), "\xA0", awoo_jsx_hm("a", {
-      href: "javascript:void()",
-      "x-bind:title": "'Edit \"' + tag.display_name() + '\"'",
-      "x-on:click": "$event.preventDefault(); tagbox._edit_tag(tag);"
-    }, EDIT_ICON()), "\xA0")), awoo_jsx_hm("a", {
-      target: "_blank",
-      "x-bind:class": "{ ['tag-type-' + tag.category_id]: (tag instanceof NormalTag && tag.is_add && tag.category !== 'unknown') }",
-      "x-bind:href": "'/posts?tags=' + tag.search_string()",
-      "x-text": "tag.display_name()"
-    }))))))));
-  }
   constructor(el) {
     this.tag_list = Alpine.reactive(new TagList());
     this.notice = Alpine.reactive([]);
@@ -899,7 +844,6 @@ class BetterTagBox {
       }
       return tag;
     }).join(" ");
-    $("#post_tag_string").parent().addClass("flex flex-col gap-2").append(this._make_tag_box());
     Alpine.effect(() => {
       this._tag_list_updated();
     });
@@ -958,7 +902,7 @@ class BetterTagBox {
           /* Non-web sources don't have source data */
           if ($(".source-data").length > 0) {
             new MutationObserver(_ => {
-              this._commentary_changed();
+              Alpine.nextTick(() => this._commentary_changed());
             }).observe($(".source-data")[0].parentElement, {
               childList: true
             });
@@ -1272,13 +1216,12 @@ class BetterTagBox {
       }
     }
     const commentary_tags = ["commentary", "hashtag-only_commentary"];
-    logger$4.info("Hashtag-only:", hashtag_only);
+    logger$4.info("Hashtag-only:", hashtag_only, source_title, source_description);
     if (hashtag_only) {
       this.tag_list.apply_tags(commentary_tags);
     } else {
       this.tag_list.remove_tags(commentary_tags);
     }
-    this._tag_list_updated();
   }
   _try_undo(select) {
     if (this._history.length === 0) {
@@ -1316,10 +1259,69 @@ class BetterTagBoxFeature extends Feature {
   }
   enable() {
     logger$4.info("Enabling");
-    $(".upload-edit-container, #edit").attr("x-init", "tagbox.init()").attr("x-data", "{ tagbox: new BetterTagBox($el) }");
+    $("#post_tag_string").parent().addClass("flex flex-col gap-2").append(this._make_tag_box());
   }
   disable() {
     logger$4.info("Disabling");
+  }
+  _make_tag_box() {
+    return awoo_jsx_hm("span", {
+      "x-data": "{ tagbox: new BetterTagBox($el) }",
+      "x-init": "tagbox.init()",
+      class: "flex flex-col gap-2"
+    }, awoo_jsx_hm("input", {
+      type: "text",
+      id: "awoo-tag-box",
+      "x-on:keydown": "tagbox._tag_box_keydown.bind(tagbox)"
+    }), awoo_jsx_hm("span", {
+      id: "awoo-copy-controls"
+    }, awoo_jsx_hm("a", {
+      href: "javascript:void()",
+      "x-on:click": "$event.preventDefault(); await navigator.clipboard.writeText(tagbox.tag_list.tag_string); Danbooru.Utility.notice('Tags copied'); $($event.target).blur();"
+    }, "Copy tags"), " | ", awoo_jsx_hm("a", {
+      href: "javascript:void()",
+      "x-on:click": "$event.preventDefault(); tagbox.tag_string = await navigator.clipboard.readText(); Danbooru.Utility.notice('Tags pasted'); $($event.target).blur();"
+    }, "Paste tags")), awoo_jsx_hm("template", {
+      "x-if": "tagbox.notice.length > 0"
+    }, awoo_jsx_hm("div", {
+      id: "awoo-error-list",
+      class: "p-2 h-fit space-y-1 card"
+    }, awoo_jsx_hm("ul", null, awoo_jsx_hm("template", {
+      "x-for": "notice in tagbox.notice"
+    }, awoo_jsx_hm("li", {
+      class: "awoo-tag-error",
+      "x-html": "notice"
+    }))))), awoo_jsx_hm("div", {
+      id: "awoo-tag-list",
+      class: "p-2 h-fit space-y-1 card"
+    }, awoo_jsx_hm("ul", null, awoo_jsx_hm("template", {
+      "x-for": "[what, cb] in tagbox.tag_list_callbacks"
+    }, awoo_jsx_hm("span", null, awoo_jsx_hm("template", {
+      "x-for": "tag in tagbox.tag_list.filter(cb).sort()",
+      "x-bind:data-what": "what"
+    }, awoo_jsx_hm("li", {
+      class: "awoo-tag",
+      "x-bind:class": "{ 'awoo-tag-error': tagbox.error_tags.has(tag.tag_string()), [tag.class_string()]: true,  }",
+      "x-bind:data-tag-string": "tag.tag_string()",
+      "x-bind:data-tag-type": "tag?.category || 'unknown'"
+    }, awoo_jsx_hm("template", {
+      "x-if": "tag instanceof MetaTag && tag.key === 'rating'"
+    }, awoo_jsx_hm("span", null, "\xA0\xA0\xA0\xA0\xA0\xA0\xA0")), awoo_jsx_hm("template", {
+      "x-if": "!(tag instanceof MetaTag && tag.key === 'rating')"
+    }, awoo_jsx_hm("span", null, awoo_jsx_hm("a", {
+      href: "javascript:void()",
+      "x-bind:title": "'Remove \"' + tag.display_name() + '\"'",
+      "x-on:click": "$event.preventDefault(); tagbox.tag_list.remove_tag(tag);"
+    }, DELETE_ICON()), "\xA0", awoo_jsx_hm("a", {
+      href: "javascript:void()",
+      "x-bind:title": "'Edit \"' + tag.display_name() + '\"'",
+      "x-on:click": "$event.preventDefault(); tagbox._edit_tag(tag);"
+    }, EDIT_ICON()), "\xA0")), awoo_jsx_hm("a", {
+      target: "_blank",
+      "x-bind:class": "{ ['tag-type-' + tag.category_id]: (tag instanceof NormalTag && tag.is_add && tag.category !== 'unknown') }",
+      "x-bind:href": "'/posts?tags=' + tag.search_string()",
+      "x-text": "tag.display_name()"
+    }))))))));
   }
 }function notice(msg) {
   Danbooru.notice($("<span>").append(msg).html());

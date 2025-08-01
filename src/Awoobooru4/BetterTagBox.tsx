@@ -86,74 +86,6 @@ export class BetterTagBox {
         return $("#awoo-tag-box").val().toString().toLocaleLowerCase().trim().replace(" ", "_");
     }
 
-    private _make_tag_box(): HTMLElement {
-        return <>
-            <input type="text" id="awoo-tag-box" x-on:keydown="tagbox._tag_box_keydown.bind(tagbox)" />
-            <span id="awoo-copy-controls">
-                <a href="javascript:void()"
-                    x-on:click="$event.preventDefault();
-                                await navigator.clipboard.writeText(tagbox.tag_list.tag_string);
-                                Danbooru.Utility.notice('Tags copied');
-                                $($event.target).blur();">
-                        Copy tags</a>
-                {" | "}
-                <a href="javascript:void()"
-                    x-on:click="$event.preventDefault();
-                                tagbox.tag_string = await navigator.clipboard.readText();
-                                Danbooru.Utility.notice('Tags pasted');
-                                $($event.target).blur();">Paste tags</a>
-            </span>
-            <template x-if="tagbox.notice.length > 0">
-                <div id="awoo-error-list" class="p-2 h-fit space-y-1 card">
-                    <ul>
-                        <template x-for="notice in tagbox.notice">
-                            <li class="awoo-tag-error" x-html="notice"></li>
-                        </template>
-                    </ul>
-                </div>
-            </template>
-            <div id="awoo-tag-list" class="p-2 h-fit space-y-1 card">
-                <ul>
-                    <template x-for="[what, cb] in tagbox.tag_list_callbacks">
-                        <span>
-                            <template x-for="tag in tagbox.tag_list.filter(cb).sort()" x-bind:data-what="what">
-                                <li class="awoo-tag"
-                                    x-bind:class="{ 'awoo-tag-error': tagbox.error_tags.has(tag.tag_string()), [tag.class_string()]: true,  }"
-                                    x-bind:data-tag-string="tag.tag_string()"
-                                    x-bind:data-tag-type="tag?.category || 'unknown'">
-                                    <template x-if="tag instanceof MetaTag && tag.key === 'rating'">
-                                        <span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
-                                    </template>
-                                    <template x-if="!(tag instanceof MetaTag && tag.key === 'rating')">
-                                        <span>
-                                            <a href="javascript:void()"
-                                                x-bind:title="'Remove &quot;' + tag.display_name() + '&quot;'"
-                                                x-on:click="$event.preventDefault(); tagbox.tag_list.remove_tag(tag);">
-                                                {DELETE_ICON()}
-                                            </a>
-                                            &nbsp;
-                                            <a href="javascript:void()"
-                                                x-bind:title="'Edit &quot;' + tag.display_name() + '&quot;'"
-                                                x-on:click="$event.preventDefault(); tagbox._edit_tag(tag);">
-                                                {EDIT_ICON()}
-                                            </a>
-                                            &nbsp;
-                                        </span>
-                                    </template>
-
-                                    <a target="_blank"
-                                        x-bind:class="{ ['tag-type-' + tag.category_id]: (tag instanceof NormalTag && tag.is_add && tag.category !== 'unknown') }"
-                                        x-bind:href="'/posts?tags=' + tag.search_string()"
-                                        x-text="tag.display_name()"></a>
-                                </li>
-                            </template>
-                        </span>
-                    </template>
-                </ul>
-            </div>
-        </>;
-    }
-
     public constructor(el: HTMLElement) {
         logger.info("Initializing on", el);
 
@@ -249,10 +181,6 @@ export class BetterTagBox {
             return tag;
         }).join(" ");
 
-        $("#post_tag_string").parent()
-            .addClass("flex flex-col gap-2")
-            .append(this._make_tag_box());
-
         Alpine.effect(() => {
             this._tag_list_updated();
         });
@@ -314,10 +242,10 @@ export class BetterTagBox {
                 /* Non-web sources don't have source data */
                 if ($(".source-data").length > 0) {
                     new MutationObserver(_ => {
-                        this._commentary_changed();
+                        Alpine.nextTick(() => this._commentary_changed());
                     }).observe($(".source-data")[0].parentElement, { childList: true });
             
-                    $("#post_artist_commentary_original_title,#post_artist_commentary_original_description").on("change", _ => this._commentary_changed());
+                    $("#post_artist_commentary_original_title,#post_artist_commentary_original_description").on("change", _ => this._commentary_changed() );
                 }
                 break;
             }
@@ -699,15 +627,13 @@ export class BetterTagBox {
             "hashtag-only_commentary"
         ];
 
-        logger.info("Hashtag-only:", hashtag_only);
+        logger.info("Hashtag-only:", hashtag_only, source_title, source_description);
 
         if (hashtag_only) {
             this.tag_list.apply_tags(commentary_tags);
         } else {
             this.tag_list.remove_tags(commentary_tags);
         }
-
-        this._tag_list_updated();
     }
 
     private _try_undo(select: boolean) {
@@ -759,12 +685,81 @@ export default class BetterTagBoxFeature extends Feature {
     public enable() {
         logger.info("Enabling");
 
-        $(".upload-edit-container, #edit")
-            .attr("x-init", "tagbox.init()")
-            .attr("x-data", "{ tagbox: new BetterTagBox($el) }");
+        $("#post_tag_string").parent()
+            .addClass("flex flex-col gap-2")
+            .append(this._make_tag_box());
+        
     }
 
     public disable() {
         logger.info("Disabling");
+    }
+
+    private _make_tag_box(): HTMLElement {
+        return <span x-data="{ tagbox: new BetterTagBox($el) }" x-init="tagbox.init()" class="flex flex-col gap-2">
+            <input type="text" id="awoo-tag-box" x-on:keydown="tagbox._tag_box_keydown.bind(tagbox)" />
+            <span id="awoo-copy-controls">
+                <a href="javascript:void()"
+                    x-on:click="$event.preventDefault();
+                                await navigator.clipboard.writeText(tagbox.tag_list.tag_string);
+                                Danbooru.Utility.notice('Tags copied');
+                                $($event.target).blur();">
+                        Copy tags</a>
+                {" | "}
+                <a href="javascript:void()"
+                    x-on:click="$event.preventDefault();
+                                tagbox.tag_string = await navigator.clipboard.readText();
+                                Danbooru.Utility.notice('Tags pasted');
+                                $($event.target).blur();">Paste tags</a>
+            </span>
+            <template x-if="tagbox.notice.length > 0">
+                <div id="awoo-error-list" class="p-2 h-fit space-y-1 card">
+                    <ul>
+                        <template x-for="notice in tagbox.notice">
+                            <li class="awoo-tag-error" x-html="notice"></li>
+                        </template>
+                    </ul>
+                </div>
+            </template>
+            <div id="awoo-tag-list" class="p-2 h-fit space-y-1 card">
+                <ul>
+                    <template x-for="[what, cb] in tagbox.tag_list_callbacks">
+                        <span>
+                            <template x-for="tag in tagbox.tag_list.filter(cb).sort()" x-bind:data-what="what">
+                                <li class="awoo-tag"
+                                    x-bind:class="{ 'awoo-tag-error': tagbox.error_tags.has(tag.tag_string()), [tag.class_string()]: true,  }"
+                                    x-bind:data-tag-string="tag.tag_string()"
+                                    x-bind:data-tag-type="tag?.category || 'unknown'">
+                                    <template x-if="tag instanceof MetaTag && tag.key === 'rating'">
+                                        <span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
+                                    </template>
+                                    <template x-if="!(tag instanceof MetaTag && tag.key === 'rating')">
+                                        <span>
+                                            <a href="javascript:void()"
+                                                x-bind:title="'Remove &quot;' + tag.display_name() + '&quot;'"
+                                                x-on:click="$event.preventDefault(); tagbox.tag_list.remove_tag(tag);">
+                                                {DELETE_ICON()}
+                                            </a>
+                                            &nbsp;
+                                            <a href="javascript:void()"
+                                                x-bind:title="'Edit &quot;' + tag.display_name() + '&quot;'"
+                                                x-on:click="$event.preventDefault(); tagbox._edit_tag(tag);">
+                                                {EDIT_ICON()}
+                                            </a>
+                                            &nbsp;
+                                        </span>
+                                    </template>
+
+                                    <a target="_blank"
+                                        x-bind:class="{ ['tag-type-' + tag.category_id]: (tag instanceof NormalTag && tag.is_add && tag.category !== 'unknown') }"
+                                        x-bind:href="'/posts?tags=' + tag.search_string()"
+                                        x-text="tag.display_name()"></a>
+                                </li>
+                            </template>
+                        </span>
+                    </template>
+                </ul>
+            </div>
+        </span>;
     }
 }
