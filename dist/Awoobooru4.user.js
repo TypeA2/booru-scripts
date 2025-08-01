@@ -3,7 +3,7 @@
 // @namespace   https://github.com/TypeA2/booru-scripts
 // @match       *://*.donmai.us/*
 // @match       *://cos.lycore.co/*
-// @version     4.1.1
+// @version     4.1.2
 // @author      TypeA2
 // @description Various utilities to make life easier
 // @require     https://cdn.jsdelivr.net/npm/@violentmonkey/dom@2
@@ -899,10 +899,10 @@ class BetterTagBox {
       }
       return tag;
     }).join(" ");
+    $("#post_tag_string").parent().addClass("flex flex-col gap-2").append(this._make_tag_box());
     Alpine.effect(() => {
       this._tag_list_updated();
     });
-    $("#post_tag_string").parent().append(this._make_tag_box()).addClass("flex flex-col gap-2");
 
     /* Re-implement autocomplete to have more control */
     $("#awoo-tag-box").autocomplete({

@@ -249,14 +249,13 @@ export class BetterTagBox {
             return tag;
         }).join(" ");
 
+        $("#post_tag_string").parent()
+            .addClass("flex flex-col gap-2")
+            .append(this._make_tag_box());
 
         Alpine.effect(() => {
             this._tag_list_updated();
         });
-
-        $("#post_tag_string").parent()
-            .append(this._make_tag_box())
-            .addClass("flex flex-col gap-2");
 
         /* Re-implement autocomplete to have more control */
         $("#awoo-tag-box").autocomplete({
