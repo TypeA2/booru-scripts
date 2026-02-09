@@ -3,7 +3,7 @@
 // @namespace   https://github.com/TypeA2/booru-scripts
 // @match       *://*.donmai.us/*
 // @match       *://cos.lycore.co/*
-// @version     4.1.4
+// @version     4.1.5
 // @author      TypeA2
 // @description Various utilities to make life easier
 // @require     https://cdn.jsdelivr.net/npm/@violentmonkey/dom@2
@@ -1217,7 +1217,7 @@ class BetterTagBox {
         }
       }
     }
-    const commentary_tags = ["commentary", "untranslatable_commentary"];
+    const commentary_tags = ["commentary", "hashtag-only_commentary", "untranslatable_commentary"];
     logger$4.info("Hashtag-only:", hashtag_only, source_title, source_description);
     if (hashtag_only) {
       this.tag_list.apply_tags(commentary_tags);

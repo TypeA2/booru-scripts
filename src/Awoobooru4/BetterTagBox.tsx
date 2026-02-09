@@ -628,6 +628,7 @@ export class BetterTagBox {
 
         const commentary_tags = [
             "commentary",
+            "hashtag-only_commentary",
             "untranslatable_commentary"
         ];
 
