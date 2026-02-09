@@ -46,7 +46,7 @@ const MUTUALLY_EXCLUSIVE: (string | string[])[][] = [
     [ ...GIRL_CHARCOUNTERS ],
     [ ...BOY_CHARCOUNTERS ],
     [ ...OTHER_CHARCOUNTERS ],
-    [ [ "commentary_request", "partial_commentary" ], "commentary" ],
+    [ [ "commentary_request", "partial_commentary" ], ["commentary", "untranslatable_commentary"] ],
     [ "solo", [ ...GIRL_CHARCOUNTERS.difference(new Set([ "1girl" ]))] ],
     [ "solo", [ ...BOY_CHARCOUNTERS.difference(new Set([ "1boy" ]))] ],
     [ "solo", [ ...OTHER_CHARCOUNTERS.difference(new Set([ "1other" ]))] ],
@@ -499,12 +499,16 @@ export class BetterTagBox {
         ///
 
         /// No commentary tags despite being applicable
-        if (!tags.has("commentary") && !tags.has("commentary_request") && !tags.has("symbol-only_commentary")
+        if (!tags.has("commentary") && !tags.has("commentary_request") && !tags.has("untranslatable_commentary") && !tags.has("partial_commentary")
             && ($("#post_artist_commentary_original_title,#artist_commentary_original_title").val() || $("#post_artist_commentary_original_description,#artist_commentary_original_description").val())) {
         
             ret = false;
 
-            const commentary = ($("#post_artist_commentary_original_title,#artist_commentary_original_title").val() as string + $("#post_artist_commentary_original_description,#artist_commentary_original_description").val() as string).trim();
+            const title = $("#post_artist_commentary_original_title,#artist_commentary_original_title").val() as string;
+            const body = $("#post_artist_commentary_original_description,#artist_commentary_original_description").val() as string;
+
+            const commentary = title + ((title.length > 0 && body.length > 0) ? "<code>\\n</code>" : "") + body;
+
             this.notice.push(`No commentary tags: "${commentary.slice(0, 10)}${commentary.length > 10 ? "..." : ""}"`);
         }
 
@@ -624,7 +628,7 @@ export class BetterTagBox {
 
         const commentary_tags = [
             "commentary",
-            "hashtag-only_commentary"
+            "untranslatable_commentary"
         ];
 
         logger.info("Hashtag-only:", hashtag_only, source_title, source_description);

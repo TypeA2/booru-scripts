@@ -3,7 +3,7 @@
 // @namespace   https://github.com/TypeA2/booru-scripts
 // @match       *://*.donmai.us/*
 // @match       *://cos.lycore.co/*
-// @version     4.1.3
+// @version     4.1.4
 // @author      TypeA2
 // @description Various utilities to make life easier
 // @require     https://cdn.jsdelivr.net/npm/@violentmonkey/dom@2
@@ -747,7 +747,7 @@ function node_is_html(node) {
 const GIRL_CHARCOUNTERS = new Set(["1girl", "2girls", "3girls", "4girls", "5girls", "6+girls"]);
 const BOY_CHARCOUNTERS = new Set(["1boy", "2boys", "3boys", "4boys", "5boys", "6+boys"]);
 const OTHER_CHARCOUNTERS = new Set(["1other", "2others", "3others", "4others", "5others", "6+others"]);
-const MUTUALLY_EXCLUSIVE = [[...GIRL_CHARCOUNTERS], [...BOY_CHARCOUNTERS], [...OTHER_CHARCOUNTERS], [["commentary_request", "partial_commentary"], "commentary"], ["solo", [...GIRL_CHARCOUNTERS.difference(new Set(["1girl"]))]], ["solo", [...BOY_CHARCOUNTERS.difference(new Set(["1boy"]))]], ["solo", [...OTHER_CHARCOUNTERS.difference(new Set(["1other"]))]]];
+const MUTUALLY_EXCLUSIVE = [[...GIRL_CHARCOUNTERS], [...BOY_CHARCOUNTERS], [...OTHER_CHARCOUNTERS], [["commentary_request", "partial_commentary"], ["commentary", "untranslatable_commentary"]], ["solo", [...GIRL_CHARCOUNTERS.difference(new Set(["1girl"]))]], ["solo", [...BOY_CHARCOUNTERS.difference(new Set(["1boy"]))]], ["solo", [...OTHER_CHARCOUNTERS.difference(new Set(["1other"]))]]];
 class BetterTagBox {
   get tag_list_callbacks() {
     const callback_builder = category => [category, t => t instanceof NormalTag && !t.is_deprecated && t.category === category];
@@ -1120,9 +1120,11 @@ class BetterTagBox {
     ///
 
     /// No commentary tags despite being applicable
-    if (!tags.has("commentary") && !tags.has("commentary_request") && !tags.has("symbol-only_commentary") && ($("#post_artist_commentary_original_title,#artist_commentary_original_title").val() || $("#post_artist_commentary_original_description,#artist_commentary_original_description").val())) {
+    if (!tags.has("commentary") && !tags.has("commentary_request") && !tags.has("untranslatable_commentary") && !tags.has("partial_commentary") && ($("#post_artist_commentary_original_title,#artist_commentary_original_title").val() || $("#post_artist_commentary_original_description,#artist_commentary_original_description").val())) {
       ret = false;
-      const commentary = ($("#post_artist_commentary_original_title,#artist_commentary_original_title").val() + $("#post_artist_commentary_original_description,#artist_commentary_original_description").val()).trim();
+      const title = $("#post_artist_commentary_original_title,#artist_commentary_original_title").val();
+      const body = $("#post_artist_commentary_original_description,#artist_commentary_original_description").val();
+      const commentary = title + (title.length > 0 && body.length > 0 ? "<code>\\n</code>" : "") + body;
       this.notice.push(`No commentary tags: "${commentary.slice(0, 10)}${commentary.length > 10 ? "..." : ""}"`);
     }
     if (($("#post_translated_commentary_title").val() || $("#post_translated_commentary_desc").val()) && !tags.has("commentary") && !tags.has("partial_commentary")) {
@@ -1215,7 +1217,7 @@ class BetterTagBox {
         }
       }
     }
-    const commentary_tags = ["commentary", "hashtag-only_commentary"];
+    const commentary_tags = ["commentary", "untranslatable_commentary"];
     logger$4.info("Hashtag-only:", hashtag_only, source_title, source_description);
     if (hashtag_only) {
       this.tag_list.apply_tags(commentary_tags);
