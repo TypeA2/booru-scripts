@@ -115,7 +115,7 @@ export default class OneUpFeature extends Feature {
     }
 
     private process_elements(): void {
-        for (const post of document.querySelectorAll<HTMLElement>(".iqdb-posts article")) {
+        for (const post of document.querySelectorAll<HTMLElement>(".similar-images-component article")) {
             const target = post.querySelector<HTMLElement>(":has(> div > .iqdb-similarity-score)");
 
             target.appendChild(<div>

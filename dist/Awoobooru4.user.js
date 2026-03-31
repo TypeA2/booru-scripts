@@ -3,7 +3,7 @@
 // @namespace   https://github.com/TypeA2/booru-scripts
 // @match       *://*.donmai.us/*
 // @match       *://cos.lycore.co/*
-// @version     4.1.6
+// @version     4.1.7
 // @author      TypeA2
 // @description Various utilities to make life easier
 // @require     https://cdn.jsdelivr.net/npm/@violentmonkey/dom@2
@@ -1390,7 +1390,7 @@ class OneUpFeature extends Feature {
     }
   }
   process_elements() {
-    for (const post of document.querySelectorAll(".iqdb-posts article")) {
+    for (const post of document.querySelectorAll(".similar-images-component article")) {
       const target = post.querySelector(":has(> div > .iqdb-similarity-score)");
       target.appendChild(awoo_jsx_hm("div", null, "Make: ", awoo_jsx_hm("a", {
         class: "awoo-link",
