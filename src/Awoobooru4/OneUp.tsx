@@ -137,7 +137,7 @@ export default class OneUpFeature extends Feature {
                 switch (mutation.type) {
                     case "childList":
                         for (const node of mutation.addedNodes) {
-                            if ((node as HTMLElement).className === "iqdb-posts") {
+                            if ((node as HTMLElement).className === "similar-images-component") {
                                 this.process_elements();
                                 observer.disconnect();
                                 return;

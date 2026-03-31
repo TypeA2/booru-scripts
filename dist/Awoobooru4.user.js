@@ -3,7 +3,7 @@
 // @namespace   https://github.com/TypeA2/booru-scripts
 // @match       *://*.donmai.us/*
 // @match       *://cos.lycore.co/*
-// @version     4.1.7
+// @version     4.1.8
 // @author      TypeA2
 // @description Various utilities to make life easier
 // @require     https://cdn.jsdelivr.net/npm/@violentmonkey/dom@2
@@ -1427,7 +1427,7 @@ class OneUpFeature extends Feature {
         switch (mutation.type) {
           case "childList":
             for (const node of mutation.addedNodes) {
-              if (node.className === "iqdb-posts") {
+              if (node.className === "similar-images-component") {
                 this.process_elements();
                 observer.disconnect();
                 return;
