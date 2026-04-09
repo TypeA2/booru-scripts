@@ -187,11 +187,12 @@ export class BetterTagBox {
 
         /* Re-implement autocomplete to have more control */
         $("#awoo-tag-box").autocomplete({
-            select: (_, ui) => {
+            select: (e, ui) => {
                 const el = ui.item as JQuery<HTMLLIElement>;
 
                 $("#awoo-tag-box").val((el.data("is-negated") ? "-" : "") + el.data("autocomplete-value"));
                 this._try_add_tag(this.tag_box);
+                e.preventDefault();
             },
             source: async (req: { term: string; }, res: (data: JQuery<HTMLLIElement>[]) => void) => {
                 res(await this._autocomplete_source(req.term));

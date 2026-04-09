@@ -3,7 +3,7 @@
 // @namespace   https://github.com/TypeA2/booru-scripts
 // @match       *://*.donmai.us/*
 // @match       *://cos.lycore.co/*
-// @version     4.1.8
+// @version     4.1.9
 // @author      TypeA2
 // @description Various utilities to make life easier
 // @require     https://cdn.jsdelivr.net/npm/@violentmonkey/dom@2
@@ -850,10 +850,11 @@ class BetterTagBox {
 
     /* Re-implement autocomplete to have more control */
     $("#awoo-tag-box").autocomplete({
-      select: (_, ui) => {
+      select: (e, ui) => {
         const el = ui.item;
         $("#awoo-tag-box").val((el.data("is-negated") ? "-" : "") + el.data("autocomplete-value"));
         this._try_add_tag(this.tag_box);
+        e.preventDefault();
       },
       source: async (req, res) => {
         res(await this._autocomplete_source(req.term));
