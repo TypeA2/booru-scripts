@@ -136,46 +136,84 @@ async function do_stitch(e: JQuery.ClickEvent) {
         progress_append(" Done");
     }
 
-    progress_raw(mount(
-        <p>
-            Uploading... &nbsp;
-            <svg class="icon svg-icon animate-spin" viewBox="0 0 512 512">
-                <path fill="currentColor" d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/>
-            </svg>
-        </p>
-    ));
-    try {
-        const upload_id = await upload_file(file);
+    const do_upload = async (new_tab: boolean = false) => {
+        try {
+            progress_raw(mount(
+                <p>
+                    Uploading... &nbsp;
+                    <svg class="icon svg-icon animate-spin" viewBox="0 0 512 512">
+                        <path fill="currentColor" d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/>
+                    </svg>
+                </p>
+            ));
 
-        progress_replace("Uploading... done");
+            const upload_id = await upload_file(file);
 
-        progress("Redirecting...");
+            progress_replace("Uploading... done");
 
-        let tags = "stitched";
+            progress("Redirecting...");
 
-        if (is_lossy_lossless) {
-            tags += " lossy-lossless";
-        }
+            let tags = "stitched";
 
-        const query = new URLSearchParams();
-
-        if (data.source && source_data) {
-            query.append("post[source]", source_data.page_url);
-            query.append("post[artist_commentary][original_title]", source_data.artist_commentary.dtext_title);
-            query.append("post[artist_commentary][original_description]", source_data.artist_commentary.dtext_description);
-
-            for (const artist of source_data.artist.artists) {
-                tags += ` ${artist.name}`;
+            if (is_lossy_lossless) {
+                tags += " lossy-lossless";
             }
+
+            const query = new URLSearchParams();
+
+            if (data.source && source_data) {
+                query.append("post[source]", source_data.page_url);
+                query.append("post[artist_commentary][original_title]", source_data.artist_commentary.dtext_title);
+                query.append("post[artist_commentary][original_description]", source_data.artist_commentary.dtext_description);
+
+                for (const artist of source_data.artist.artists) {
+                    tags += ` ${artist.name}`;
+                }
+            }
+
+            query.append("post[tag_string]", tags);
+
+            const url = new URL(`${window.location.origin}/uploads/${upload_id}?${query}`).toString();
+
+            if (new_tab) {
+                window.open(url, "_blank")?.focus();
+
+                // @ts-expect-error jQuery UI's type definitions are borked and I don't want to fix it
+                $(dialog).dialog("destroy");
+            } else {
+                window.location.href = url;
+            }
+
+        } catch (error) {
+            progress_replace(`Uploading... Error: ${(error as Error).message}`);
+            return;
         }
+    };
 
-        query.append("post[tag_string]", tags);
+    if (auto_upload_enabled()) {
+        await do_upload();
+    } else {
+        const prompt = mount(<p>Upload in: <button type="button" class="btn button-primary" data-target="here">This tab</button>&nbsp;<button type="button" class="btn button-primary" data-target="there">New tab</button></p>);
 
-        window.location.href = new URL(`${window.location.origin}/uploads/${upload_id}?${query}`).toString();
-    } catch (error) {
-        progress_replace(`Uploading... Error: ${(error as Error).message}`);
-        return;
+        $(prompt).on("click", "button", async (e) => {
+            const target = e.target.dataset.target as "here" | "there";
+
+            e.target.disabled = true;
+            $(prompt).find("button").prop("disabled", "disabled");
+            $(prompt).find(`button[data-target]:not([data-target=${target}])`).remove();
+            await do_upload(target === "there");
+        });
+
+        progress_raw(prompt);
     }
+}
+
+function auto_upload_enabled(): boolean {
+    return GM_getValue("typea2:upload-stitch-auto-mode", true);
+}
+
+function set_auto_upload(state: boolean) {
+    GM_setValue("typea2:upload-stitch-auto-mode", state);
 }
 
 function validate_dimensions(upload: Upload, mode: StitchMode): string | null {
@@ -326,7 +364,7 @@ function add_toolbar() {
                 </svg>
             </a>
             <ul class="popup-menu-content">
-                <li>Stitch:</li>
+                <li data-hide-on-click="false"><label for="upload-mode" style="font-weight: bold;"><input type="checkbox" class="toggle-switch" id="upload-mode" checked={auto_upload_enabled()} /> Auto upload</label></li>
                 <li>
                     <a href="#" class="stitch-button" data-orientation="right">
                         <svg class="icon svg-icon" viewBox="0 0 512 512" transform="rotate(90)">
@@ -377,6 +415,8 @@ function add_toolbar() {
     }
 
     $(menu).on("click", "a.stitch-button", do_stitch);
+
+    $(menu).on("input", "input#upload-mode", e => set_auto_upload(e.target.checked));
 
     $(menu).insertAfter("#a-index .tab-list > .tab:nth-child(3)");
     logger.info("Added toolbar", menu);

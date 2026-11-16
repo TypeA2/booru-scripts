@@ -4,13 +4,15 @@
 // @match       *://*.donmai.us/uploads/*/assets
 // @match       *://cos.lycore.co/uploads/*/assets
 // @match       *://donmai.moe/uploads/*/assets
-// @version     1.0.0
+// @version     1.1.0
 // @author      TypeA2
 // @description Easily stitch multi-image uploads
 // @require     https://cdn.jsdelivr.net/npm/@violentmonkey/dom@2
 // @downloadURL https://github.com/TypeA2/booru-scripts/raw/refs/heads/master/dist/upload-stitch.user.js
 // @updateURL   https://github.com/TypeA2/booru-scripts/raw/refs/heads/master/dist/upload-stitch.user.js
 // @run-at      document-end
+// @grant       GM_getValue
+// @grant       GM_setValue
 // ==/UserScript==
 
 (function(){'use strict';class Logger {
@@ -131,36 +133,74 @@ async function do_stitch(e) {
     })}`)).json();
     progress_append(" Done");
   }
-  progress_raw(mount(VM.h("p", null, "Uploading... \xA0", VM.h("svg", {
-    class: "icon svg-icon animate-spin",
-    viewBox: "0 0 512 512"
-  }, VM.h("path", {
-    fill: "currentColor",
-    d: "M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"
-  })))));
-  try {
-    const upload_id = await upload_file(file);
-    progress_replace("Uploading... done");
-    progress("Redirecting...");
-    let tags = "stitched";
-    if (is_lossy_lossless) {
-      tags += " lossy-lossless";
-    }
-    const query = new URLSearchParams();
-    if (data.source && source_data) {
-      query.append("post[source]", source_data.page_url);
-      query.append("post[artist_commentary][original_title]", source_data.artist_commentary.dtext_title);
-      query.append("post[artist_commentary][original_description]", source_data.artist_commentary.dtext_description);
-      for (const artist of source_data.artist.artists) {
-        tags += ` ${artist.name}`;
+  const do_upload = async (new_tab = false) => {
+    try {
+      progress_raw(mount(VM.h("p", null, "Uploading... \xA0", VM.h("svg", {
+        class: "icon svg-icon animate-spin",
+        viewBox: "0 0 512 512"
+      }, VM.h("path", {
+        fill: "currentColor",
+        d: "M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"
+      })))));
+      const upload_id = await upload_file(file);
+      progress_replace("Uploading... done");
+      progress("Redirecting...");
+      let tags = "stitched";
+      if (is_lossy_lossless) {
+        tags += " lossy-lossless";
       }
+      const query = new URLSearchParams();
+      if (data.source && source_data) {
+        query.append("post[source]", source_data.page_url);
+        query.append("post[artist_commentary][original_title]", source_data.artist_commentary.dtext_title);
+        query.append("post[artist_commentary][original_description]", source_data.artist_commentary.dtext_description);
+        for (const artist of source_data.artist.artists) {
+          tags += ` ${artist.name}`;
+        }
+      }
+      query.append("post[tag_string]", tags);
+      const url = new URL(`${window.location.origin}/uploads/${upload_id}?${query}`).toString();
+      if (new_tab) {
+        var _window$open;
+        (_window$open = window.open(url, "_blank")) == null || _window$open.focus();
+
+        // @ts-expect-error jQuery UI's type definitions are borked and I don't want to fix it
+        $(dialog).dialog("destroy");
+      } else {
+        window.location.href = url;
+      }
+    } catch (error) {
+      progress_replace(`Uploading... Error: ${error.message}`);
+      return;
     }
-    query.append("post[tag_string]", tags);
-    window.location.href = new URL(`${window.location.origin}/uploads/${upload_id}?${query}`).toString();
-  } catch (error) {
-    progress_replace(`Uploading... Error: ${error.message}`);
-    return;
+  };
+  if (auto_upload_enabled()) {
+    await do_upload();
+  } else {
+    const prompt = mount(VM.h("p", null, "Upload in: ", VM.h("button", {
+      type: "button",
+      class: "btn button-primary",
+      "data-target": "here"
+    }, "This tab"), "\xA0", VM.h("button", {
+      type: "button",
+      class: "btn button-primary",
+      "data-target": "there"
+    }, "New tab")));
+    $(prompt).on("click", "button", async e => {
+      const target = e.target.dataset.target;
+      e.target.disabled = true;
+      $(prompt).find("button").prop("disabled", "disabled");
+      $(prompt).find(`button[data-target]:not([data-target=${target}])`).remove();
+      await do_upload(target === "there");
+    });
+    progress_raw(prompt);
   }
+}
+function auto_upload_enabled() {
+  return GM_getValue("typea2:upload-stitch-auto-mode", true);
+}
+function set_auto_upload(state) {
+  GM_setValue("typea2:upload-stitch-auto-mode", state);
 }
 function validate_dimensions(upload, mode) {
   switch (mode) {
@@ -297,7 +337,17 @@ function add_toolbar() {
     d: "M120 256c0 30.9-25.1 56-56 56s-56-25.1-56-56s25.1-56 56-56s56 25.1 56 56zm160 0c0 30.9-25.1 56-56 56s-56-25.1-56-56s25.1-56 56-56s56 25.1 56 56zm104 56c-30.9 0-56-25.1-56-56s25.1-56 56-56s56 25.1 56 56s-25.1 56-56 56z"
   }))), VM.h("ul", {
     class: "popup-menu-content"
-  }, VM.h("li", null, "Stitch:"), VM.h("li", null, VM.h("a", {
+  }, VM.h("li", {
+    "data-hide-on-click": "false"
+  }, VM.h("label", {
+    for: "upload-mode",
+    style: "font-weight: bold;"
+  }, VM.h("input", {
+    type: "checkbox",
+    class: "toggle-switch",
+    id: "upload-mode",
+    checked: auto_upload_enabled()
+  }), " Auto upload")), VM.h("li", null, VM.h("a", {
     href: "#",
     class: "stitch-button",
     "data-orientation": "right"
@@ -355,6 +405,7 @@ function add_toolbar() {
     })), "Grid (", square_sides, "\xD7", square_sides, ")"))));
   }
   $(menu).on("click", "a.stitch-button", do_stitch);
+  $(menu).on("input", "input#upload-mode", e => set_auto_upload(e.target.checked));
   $(menu).insertAfter("#a-index .tab-list > .tab:nth-child(3)");
   logger.info("Added toolbar", menu);
 }

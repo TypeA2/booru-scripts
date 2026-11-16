@@ -4,7 +4,9 @@
 // @match       *://*.donmai.us/uploads/*/assets
 // @match       *://cos.lycore.co/uploads/*/assets
 // @match       *://donmai.moe/uploads/*/assets
-// @version     1.0.0
+// @grant       GM_getValue
+// @grant       GM_setValue
+// @version     1.1.0
 // @author      TypeA2
 // @description Easily stitch multi-image uploads
 // @require     https://cdn.jsdelivr.net/npm/@violentmonkey/dom@2
