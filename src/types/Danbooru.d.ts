@@ -8,6 +8,10 @@ declare namespace Danbooru {
 
         function notice(msg: string): void;
         function error(msg: string): void;
+
+        function dialog(title: string, html: HTMLElement): void;
+
+        function delay(ms: number): Promise<void>;
     }
 
     declare namespace RelatedTag {

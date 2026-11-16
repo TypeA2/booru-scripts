@@ -24,6 +24,7 @@ if (is_production) {
 export default defineConfig(
     Object.entries({
         'Awoobooru4': 'src/Awoobooru4/index.ts',
+        'upload-stitch': 'src/upload-stitch/index.tsx',
     }).map(([name, entry]) => ({
         input: entry,
         plugins: [
@@ -36,12 +37,13 @@ export default defineConfig(
                     }
                 },
             }),
+            commonjsPlugin(),
             babelPlugin({
                 // import helpers from '@babel/runtime'
                 babelHelpers: 'runtime',
                 plugins: [
                     [
-                        import.meta.resolve('@babel/plugin-transform-runtime'),
+                        "@babel/plugin-transform-runtime",
                         {
                             useESModules: true,
                             version: '^7.5.0', // see https://github.com/babel/babel/issues/10261#issuecomment-514687857
@@ -58,7 +60,6 @@ export default defineConfig(
                 preventAssignment: true,
             }),
             resolvePlugin({ browser: false, extensions }),
-            commonjsPlugin(),
             jsonPlugin(),
             userscript((meta) =>
                 meta.replace('process.env.AUTHOR', packageJson.author.name),

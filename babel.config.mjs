@@ -8,7 +8,7 @@ export default {
     ],
     plugins: [
         [ "@babel/plugin-transform-react-jsx", {
-            pragma: "awoo_jsx_hm",
+            pragma: "VM.h",
             pragmaFrag: "VM.Fragment",
             throwIfNamespace: false,
         }]

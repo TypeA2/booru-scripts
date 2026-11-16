@@ -1,11 +1,12 @@
 {
     "compilerOptions": {
         "target": "esnext",
-        "module": "esnext",
-        "moduleResolution": "node",
+        "module": "NodeNext",
+        "moduleResolution": "NodeNext",
         "declaration": false,
         "allowSyntheticDefaultImports": true,
         "jsx": "preserve",
+        "jsxImportSource": "solid-js",
         "skipLibCheck": true,
         "lib": [
             "DOM",
@@ -13,7 +14,8 @@
             "DOM.Iterable",
             "ScriptHost",
             "ESNext"
-        ]
+        ],
+        "types": [ "jquery" ]
     },
     "include": [
         "src/**/*"
