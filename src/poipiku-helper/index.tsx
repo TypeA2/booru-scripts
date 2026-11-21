@@ -9,7 +9,7 @@ const logger = new Logger("poipiku-helper");
 
 const POIPIKU_REGEX = /^https?:\/\/poipiku\.com\/(\d+)\/(\d+)\.html$/;
 const UPLOAD_REGEX = /^\/uploads\/(\d+)\/assets$/;
-const ASSETS_REGEX = /^\/uploads\/(\d+)\/assets\/(\d+)$/;
+const ASSETS_REGEX = /^\/uploads\/(\d+)(\/assets\/(\d+))?$/;
 
 const poipiku_match = document.location.href.match(POIPIKU_REGEX);
 const search = new URLSearchParams(window.location.search);

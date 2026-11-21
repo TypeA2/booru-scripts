@@ -1,14 +1,10 @@
 // ==UserScript==
 // @name        Poipiku helper
 // @namespace   https://github.com/TypeA2/booru-scripts
-// @match       *://*.donmai.us/uploads/new*
-// @match       *://*.donmai.us/uploads/*/assets*
-// @match       *://*.donmai.us/uploads/*/assets/*
-// @match       *://donmai.moe/uploads/new*
-// @match       *://donmai.moe/uploads/*/assets*
-// @match       *://donmai.moe/uploads/*/assets/*
+// @match       *://*.donmai.us/uploads/*
+// @match       *://donmai.moe/uploads/*
 // @match       *://poipiku.com/*/*.html
-// @version     1.0.0
+// @version     1.0.1
 // @author      TypeA2
 // @description Make uploading locked posts from Poipiku slightly less painful
 // @grant       GM.getResourceUrl
