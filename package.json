@@ -67,6 +67,7 @@
     "rollup-plugin-postcss": "^4.0.2",
     "rollup-plugin-userscript": "^1.1.0",
     "sass": "^1.108.2",
+    "sweetalert2": "^11.26.25",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.72.2",
     "unocss": "^66.13.0"

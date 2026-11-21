@@ -25,6 +25,7 @@ export default defineConfig(
     Object.entries({
         'Awoobooru4': 'src/Awoobooru4/index.ts',
         'upload-stitch': 'src/upload-stitch/index.tsx',
+        'poipiku-helper': 'src/poipiku-helper/index.tsx'
     }).map(([name, entry]) => ({
         input: entry,
         plugins: [
