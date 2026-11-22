@@ -129,6 +129,12 @@ async function do_stitch(e: JQuery.ClickEvent) {
     const file = new File([blob], `${upload_id}_${orientation}_stitch.png`);
     progress_append(` ${blob?.size} bytes`);
 
+    if (blob.size > 100*1024*1024) {
+        // Too big to upload, abort
+        progress_raw(mount(<span style="color: red;">File too large, download it below and compress it elsewhere</span>));
+        return;
+    }
+
     let source_data: SourceData | null = null;
     if (data.source) {
         progress("Fetching source data...");

@@ -4,7 +4,7 @@
 // @match       *://*.donmai.us/uploads/*/assets
 // @match       *://cos.lycore.co/uploads/*/assets
 // @match       *://donmai.moe/uploads/*/assets
-// @version     1.1.0
+// @version     1.2.0
 // @author      TypeA2
 // @description Easily stitch multi-image uploads
 // @require     https://cdn.jsdelivr.net/npm/@violentmonkey/dom@2
@@ -125,6 +125,13 @@ async function do_stitch(e) {
   const blob = await new Promise(resolve => canvas.toBlob(b => resolve(b), "image/png"));
   const file = new File([blob], `${upload_id}_${orientation}_stitch.png`);
   progress_append(` ${blob == null ? void 0 : blob.size} bytes`);
+  if (blob.size > 100 * 1024 * 1024) {
+    // Too big to upload, abort
+    progress_raw(mount(VM.h("span", {
+      style: "color: red;"
+    }, "File too large, download it below and compress it elsewhere")));
+    return;
+  }
   let source_data = null;
   if (data.source) {
     progress("Fetching source data...");

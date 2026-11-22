@@ -6,7 +6,7 @@
 // @match       *://donmai.moe/uploads/*/assets
 // @grant       GM_getValue
 // @grant       GM_setValue
-// @version     1.1.0
+// @version     1.2.0
 // @author      TypeA2
 // @description Easily stitch multi-image uploads
 // @require     https://cdn.jsdelivr.net/npm/@violentmonkey/dom@2
