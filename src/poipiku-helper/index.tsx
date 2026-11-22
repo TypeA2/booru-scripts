@@ -315,7 +315,7 @@ function render_source_data(artist_id: number, post_id: number): HTMLElement {
 
             if (data.artist.artists.length > 0) {
                 $("#post_tag_string").val(
-                    $("#post_tag_string").val() as string + data.artist.artists.map(({id, name}) => `artist:${name}`)
+                    $("#post_tag_string").val() as string + data.artist.artists.map(({id, name}) => ` artist:${name} `)
                 ).trigger("input.danbooru");
             }
         }

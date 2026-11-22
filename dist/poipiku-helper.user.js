@@ -4,7 +4,7 @@
 // @match       *://*.donmai.us/uploads/*
 // @match       *://donmai.moe/uploads/*
 // @match       *://poipiku.com/*/*.html
-// @version     1.0.1
+// @version     1.0.2
 // @author      TypeA2
 // @description Make uploading locked posts from Poipiku slightly less painful
 // @connect     cdn.poipiku.com
@@ -354,7 +354,7 @@ function render_source_data(artist_id, post_id) {
         $("#post_tag_string").val($("#post_tag_string").val() + data.artist.artists.map(({
           id,
           name
-        }) => `artist:${name}`)).trigger("input.danbooru");
+        }) => ` artist:${name} `)).trigger("input.danbooru");
       }
     }
   });
