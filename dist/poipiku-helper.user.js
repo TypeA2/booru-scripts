@@ -4,7 +4,7 @@
 // @match       *://*.donmai.us/uploads/*
 // @match       *://donmai.moe/uploads/*
 // @match       *://poipiku.com/*/*.html
-// @version     1.1.0
+// @version     1.1.1
 // @author      TypeA2
 // @description Make uploading locked posts from Poipiku slightly less painful
 // @connect     cdn.poipiku.com
@@ -58,11 +58,6 @@ async function upload_url(url) {
     upload = await $.get(`/uploads/${upload.id}.json`);
   }
   return upload;
-}
-async function source_data(url) {
-  return fetch("/source.json?" + new URLSearchParams({
-    url
-  })).then(r => r.json());
 }mount(VM.h("svg", {
   class: "icon svg-icon animate-spin",
   viewBox: "0 0 512 512"
@@ -78,7 +73,7 @@ const GEAR = mount(VM.h("svg", {
   xmlns: "http://www.w3.org/2000/svg",
   d: "M495.9 166.6c3.2 8.7 .5 18.4-6.4 24.6l-43.3 39.4c1.1 8.3 1.7 16.8 1.7 25.4s-.6 17.1-1.7 25.4l43.3 39.4c6.9 6.2 9.6 15.9 6.4 24.6c-4.4 11.9-9.7 23.3-15.8 34.3l-4.7 8.1c-6.6 11-14 21.4-22.1 31.2c-5.9 7.2-15.7 9.6-24.5 6.8l-55.7-17.7c-13.4 10.3-28.2 18.9-44 25.4l-12.5 57.1c-2 9.1-9 16.3-18.2 17.8c-13.8 2.3-28 3.5-42.5 3.5s-28.7-1.2-42.5-3.5c-9.2-1.5-16.2-8.7-18.2-17.8l-12.5-57.1c-15.8-6.5-30.6-15.1-44-25.4L83.1 425.9c-8.8 2.8-18.6 .3-24.5-6.8c-8.1-9.8-15.5-20.2-22.1-31.2l-4.7-8.1c-6.1-11-11.4-22.4-15.8-34.3c-3.2-8.7-.5-18.4 6.4-24.6l43.3-39.4C64.6 273.1 64 264.6 64 256s.6-17.1 1.7-25.4L22.4 191.2c-6.9-6.2-9.6-15.9-6.4-24.6c4.4-11.9 9.7-23.3 15.8-34.3l4.7-8.1c6.6-11 14-21.4 22.1-31.2c5.9-7.2 15.7-9.6 24.5-6.8l55.7 17.7c13.4-10.3 28.2-18.9 44-25.4l12.5-57.1c2-9.1 9-16.3 18.2-17.8C227.3 1.2 241.5 0 256 0s28.7 1.2 42.5 3.5c9.2 1.5 16.2 8.7 18.2 17.8l12.5 57.1c15.8 6.5 30.6 15.1 44 25.4l55.7-17.7c8.8-2.8 18.6-.3 24.5 6.8c8.1 9.8 15.5 20.2 22.1 31.2l4.7 8.1c6.1 11 11.4 22.4 15.8 34.3zM256 336a80 80 0 1 0 0-160 80 80 0 1 0 0 160z"
 })));const POIPIKU_REGEX = /^https?:\/\/poipiku\.com\/(\d+)\/(\d+)\.html$/;
-const UPLOAD_REGEX = /^\/uploads\/(\d+)\/assets$/;
+const UPLOAD_REGEX = /^\/uploads\?search\[id\]=([\d+,])+$/;
 const poipiku_match = document.location.href.match(POIPIKU_REGEX);
 const search = new URLSearchParams(window.location.search);
 if (poipiku_match) {
@@ -86,20 +81,7 @@ if (poipiku_match) {
 } else if (window.location.pathname === "/uploads/new" && search.has("poipiku_auto_upload")) {
   on_new_upload(search.get("ref"));
 } else {
-  const upload_match = window.location.pathname.match(UPLOAD_REGEX);
-  if (upload_match) {
-    on_upload_view(parseInt(upload_match[1]));
-  }
-}
-function decode_file_name(name) {
-  const match = name.match(/^file:\/\/poipiku-(\d+)-(\d+)[.|_].+$/);
-  if (match) {
-    return {
-      artist: parseInt(match[1]),
-      post: parseInt(match[2])
-    };
-  }
-  throw new Error(`Failed to parse filename: '${name}'`);
+  window.location.pathname.match(UPLOAD_REGEX);
 }
 async function on_poipiku(user_id, post_id) {
   GM.addStyle(`
@@ -273,71 +255,10 @@ async function on_new_upload(ref) {
     component.find("input").removeAttr("disabled");
     component.find("form").removeClass("pointer-events-none cursor-wait opacity-50");
   } else {
-    window.location.href = "/uploads?search[id]=" + uploads.map(u => u.id).join(",");
-  }
-}
-async function on_upload_view(upload_id) {
-  const assets = await fetch(`/uploads/${upload_id}.json?only=upload_media_assets[source_url]`).then(r => r.json());
-  if (!assets.upload_media_assets.find(f => !f.source_url.startsWith("file://poipiku-"))) {
-    // Probably a poipiku post, fake it
-    const {
-      artist,
-      post
-    } = decode_file_name(assets.upload_media_assets[0].source_url);
-    const table = render_source_data(artist, post);
-    $(table).insertAfter("#a-index > h1");
-  }
-}
-function render_source_data(artist_id, post_id) {
-  const table = mount(VM.h("div", {
-    class: "source-data card-outlined p-4 mt-4 mb-4"
-  }, VM.h("table", {
-    class: "source-data-content mt-2"
-  }, VM.h("tbody", null, VM.h("tr", {
-    id: "artist-links"
-  }, VM.h("th", null, "Artist"), VM.h("td", null, VM.h("em", null, "Loading..."))), VM.h("tr", {
-    class: "source-data-tags"
-  }, VM.h("th", null, "Tags"), VM.h("td", null, VM.h("em", null, "Loading..."))), VM.h("tr", {
-    class: "source-data-published-at"
-  }, VM.h("th", null, "Published"), VM.h("td", null, VM.h("em", null, "None")))))));
-  source_data(`https://poipiku.com/${artist_id}/${post_id}.html`).then(data => {
-    if (data.artist.artists.length > 0) {
-      $(table).find("#artist-links").remove();
-      for (const artist of data.artist.artists.toReversed()) {
-        // XXX: No profile URLs because the icons would need to be retrieved
-
-        $(table).find("tbody").prepend(mount(VM.h("tr", null, VM.h("th", null, "Artist"), VM.h("td", null, VM.h("a", {
-          class: "tag-type-1",
-          href: `/artists/${artist.id}`
-        }, artist.name)))));
-      }
+    if (uploads.length === 1) {
+      window.location.href = `/uploads/${uploads[0].id}`;
     } else {
-      var _data$artist$display_;
-      if (((_data$artist$display_ = data.artist.display_name) == null ? void 0 : _data$artist$display_.trim().length) === 0) {
-        $(table).find("#artist-links > td > em").text("None");
-      } else {
-        $(table).find("#artist-links > td").html(mount(VM.h(VM.Fragment, null, VM.h("a", {
-          rel: "externel noreferrer nofllow",
-          href: `https://poipiku.com/${artist_id}/`
-        }, data.artist.display_name), "\xA0(", VM.h("a", {
-          target: "_blank",
-          href: `/artists/new?${new URLSearchParams({
-            "artist[source]": data.page_url
-          })}`
-        }, "Create new artist"), ")")));
-      }
+      window.location.href = "/uploads?search[id]=" + uploads.map(u => u.id).join(",");
     }
-    if (data.tags.length === 0) {
-      $(table).find(".source-data-tags > td > em").text("None");
-    } else {
-      $(table).find(".source-data-tags > td").html(mount(VM.h("div", {
-        class: "flex flex-wrap gap-1"
-      }, data.tags.map(([name, url]) => VM.h("a", {
-        rel: "external noreferrer nofollow",
-        class: "source-data-tag chip-primary text-sm break-words",
-        href: url
-      }, name)))));
-    }
-  });
-  return table;
+  }
 }})();

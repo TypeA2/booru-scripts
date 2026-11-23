@@ -8,7 +8,7 @@ import * as Icons from '../utils/icons';
 const logger = new Logger("poipiku-helper");
 
 const POIPIKU_REGEX = /^https?:\/\/poipiku\.com\/(\d+)\/(\d+)\.html$/;
-const UPLOAD_REGEX = /^\/uploads\/(\d+)\/assets$/;
+const UPLOAD_REGEX = /^\/uploads\?search\[id\]=([\d+,])+$/;
 
 const poipiku_match = document.location.href.match(POIPIKU_REGEX);
 const search = new URLSearchParams(window.location.search);
@@ -22,7 +22,7 @@ if (poipiku_match) {
     const upload_match = window.location.pathname.match(UPLOAD_REGEX);
 
     if (upload_match) {
-        on_upload_view(parseInt(upload_match[1]));
+        // on_upload_view(parseInt(upload_match[1]));
     }
 }
 
@@ -235,11 +235,16 @@ async function on_new_upload(ref: string | null) {
         component.find("input").removeAttr("disabled");
         component.find("form").removeClass("pointer-events-none cursor-wait opacity-50");
     } else {
-        window.location.href = "/uploads?search[id]=" + uploads.map(u => u.id).join(",");
+        if (uploads.length === 1) {
+            window.location.href = `/uploads/${uploads[0].id}`;
+        } else {
+            window.location.href = "/uploads?search[id]=" + uploads.map(u => u.id).join(",");
+        }
     }
 }
 
 async function on_upload_view(upload_id: number) {
+    // Currently not triggerd
     const assets =
         await fetch(`/uploads/${upload_id}.json?only=upload_media_assets[source_url]`)
                 .then(r => r.json()) as { upload_media_assets: { source_url: string }[] };

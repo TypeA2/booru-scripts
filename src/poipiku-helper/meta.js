@@ -4,7 +4,7 @@
 // @match       *://*.donmai.us/uploads/*
 // @match       *://donmai.moe/uploads/*
 // @match       *://poipiku.com/*/*.html
-// @version     1.1.0
+// @version     1.1.1
 // @author      TypeA2
 // @description Make uploading locked posts from Poipiku slightly less painful
 // @grant       GM.getResourceUrl
