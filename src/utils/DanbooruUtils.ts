@@ -19,10 +19,39 @@ export async function upload_files(files: File[]): Promise<number> {
         }
 
         await new Promise(resolve => setTimeout(resolve, 250));
-        upload = $.get(`/uploads/${upload.id}.json`);
+        upload = await $.get(`/uploads/${upload.id}.json`);
     }
 
     return upload.id;
+}
+
+interface Upload {
+    id: number;
+    status: string;
+    error: string | null;
+}
+
+export async function upload_url(url: string): Promise<Upload> {
+    const form_data = new FormData();
+    form_data.append("upload[source]", url);
+
+    const response = await fetch("/uploads.json", {
+        method: "POST",
+        headers: { "X-CSRF-Token": Danbooru.Utility.meta("csrf-token") },
+        body: form_data,
+    });
+
+    let upload = await response.json();
+    while (upload.status !== "completed") {
+        if (upload.status === "error") {
+            return upload;
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 250));
+        upload = await $.get(`/uploads/${upload.id}.json`);
+    }
+
+    return upload;
 }
 
 export interface SourceData {

@@ -9,7 +9,6 @@ const logger = new Logger("poipiku-helper");
 
 const POIPIKU_REGEX = /^https?:\/\/poipiku\.com\/(\d+)\/(\d+)\.html$/;
 const UPLOAD_REGEX = /^\/uploads\/(\d+)\/assets$/;
-const ASSETS_REGEX = /^\/uploads\/(\d+)(\/assets\/(\d+))?$/;
 
 const poipiku_match = document.location.href.match(POIPIKU_REGEX);
 const search = new URLSearchParams(window.location.search);
@@ -21,12 +20,9 @@ if (poipiku_match) {
     on_new_upload(search.get("ref"));
 } else {
     const upload_match = window.location.pathname.match(UPLOAD_REGEX);
-    const asset_match = window.location.pathname.match(ASSETS_REGEX);
 
     if (upload_match) {
         on_upload_view(parseInt(upload_match[1]));
-    } else if (asset_match) {
-        on_asset_view();
     }
 }
 
@@ -224,21 +220,22 @@ async function on_new_upload(ref: string | null) {
     const urls = JSON.parse(await GM.getValue("typea2:poipiku-upload-urls")) as string[];
     await GM.deleteValue("typea2:poipiku-upload-urls");
     
-    const blobs = await Promise.all(urls.map(async url => {
-        return GM.xmlHttpRequest({ method: "GET", responseType: "blob", url, }).then(r => [url, r.response] as [string, Blob]);
-    }));
+    const uploads = await Promise.all(urls.map(DanbooruUtils.upload_url));
 
-    if (blobs.find(([_, r]) => r.type === "text/xml")) {
-        Danbooru.error("Failed to download image, please try again");
+    if (uploads.find(u => u.status !== "completed")) {
+        const errors = new Set();
+        uploads.forEach(u => {
+            if (u.status !== "completed") {
+                errors.add(u.error);
+            }
+        });
+
+        Danbooru.error("Upload failed: " + [...errors].join(", "));
         component.find(".spinner-icon").addClass("hidden");
         component.find("input").removeAttr("disabled");
         component.find("form").removeClass("pointer-events-none cursor-wait opacity-50");
     } else {
-        const files = blobs.map(([url, blob]) => new File([blob], "poipiku-" + new URL(url).pathname.slice(1).replace("/", "-")));
-        
-        const upload_id = await DanbooruUtils.upload_files(files);
-
-        window.location.href = "/uploads/" + upload_id;
+        window.location.href = "/uploads?search[id]=" + uploads.map(u => u.id).join(",");
     }
 }
 
@@ -307,40 +304,7 @@ function render_source_data(artist_id: number, post_id: number): HTMLElement {
                 {data.tags.map(([name, url]) => <a rel="external noreferrer nofollow" class="source-data-tag chip-primary text-sm break-words" href={url}>{name}</a>)}
             </div>));
         }
-
-        if ($("#p-single-asset-upload").length === 1) {
-            // On upload page, so fill these fields too
-            $("#post_artist_commentary_original_title").val(data.artist_commentary.dtext_title);
-            $("#post_artist_commentary_original_description").val(data.artist_commentary.dtext_description);
-
-            if (data.artist.artists.length > 0) {
-                $("#post_tag_string").val(
-                    $("#post_tag_string").val() as string + data.artist.artists.map(({id, name}) => ` artist:${name} `)
-                ).trigger("input.danbooru");
-            }
-        }
     });
 
     return table;
-}
-
-function on_asset_view() {
-    const encoded_source = $("#post_source").val() as string;
-
-    const {artist, post} = decode_file_name(encoded_source);
-    $(".tab-panel.source-tab").prepend(render_source_data(artist, post));
-
-    // decode_file_name would've failed if this isn't a match
-    const [_, artist_id, filename] = encoded_source.match(/^file:\/\/poipiku-(\d+)-(.+)$/) as RegExpMatchArray;
-
-    $("#post_source").val(`https://cdn.poipiku.com/${artist_id}/${filename}`);
-    $(".upload-no-source-warning").remove();
-
-    const [__, post_id] = encoded_source.match(/^file:\/\/poipiku-\d+-(\d+).+$/) as RegExpMatchArray;
-
-    $(".upload-image-container > div > div:has(div.upload-warning-badges)").prepend(mount(<span>
-        <a rel="external noreferrer nofollow" title={`https://poipiku.com/${artist_id}/${post_id}.html`} class="inline-block align-top" href={`https://poipiku.com/${artist_id}/${post_id}.html`}>
-            <img class="icon inline-block h-4" src="/packs/static/poipiku-logo-625b08f0b6a6560a2506.png"/>
-        </a>
-    </span>));
 }
